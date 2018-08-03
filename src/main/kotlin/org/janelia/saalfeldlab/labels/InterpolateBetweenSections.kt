@@ -37,7 +37,7 @@ class InterpolateBetweenSections {
 				vararg weights: Double = doubleArrayOf(1.0),
 				distanceType: DistanceTransform.DISTANCE_TYPE = DistanceTransform.DISTANCE_TYPE.EUCLIDIAN
 		) {
-			LOG.warn("Got type {}", Util.getTypeFromInterval(distanceOutside).javaClass.simpleName)
+			LOG.debug("Got type {}", Util.getTypeFromInterval(distanceOutside).javaClass.simpleName)
 			DistanceTransform.binaryTransform(mask, distanceOutside, distanceOutside, distanceType, *weights)
 			DistanceTransform.binaryTransform(not(mask), distanceInside, distanceInside, distanceType, *weights)
 			val paired = Views.interval(Views.pair(distanceOutside, distanceInside), mask)
