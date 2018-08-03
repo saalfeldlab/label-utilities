@@ -131,6 +131,7 @@ class InterpolateBetweenSections {
 			maxValForR.setReal(maxValForR.maxValue)
 
 			for (label in labels) {
+				if (label == background) continue
 				val mask1 = Converters.convert(section1, { s, t -> t.set(s.integerLong == label) }, BoolType())
 				val mask2 = Converters.convert(section2, { s, t -> t.set(s.integerLong == label) }, BoolType())
 				signedDistanceTransform(mask1, distance11, distance12, distance11, postCalc, distanceType = distanceType, weights = *transformWeights)
