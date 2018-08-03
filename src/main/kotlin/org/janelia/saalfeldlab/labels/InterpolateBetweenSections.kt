@@ -1,6 +1,6 @@
 package org.janelia.saalfeldlab.labels
 
-import gnu.trove.set.TLongSet
+import gnu.trove.map.hash.TLongObjectHashMap
 import gnu.trove.set.hash.TLongHashSet
 import net.imglib2.Dimensions
 import net.imglib2.RandomAccessibleInterval
@@ -18,6 +18,7 @@ import net.imglib2.util.Util
 import net.imglib2.view.Views
 import org.slf4j.LoggerFactory
 import java.lang.invoke.MethodHandles
+import java.util.*
 import java.util.stream.Collectors
 import java.util.stream.Stream
 
@@ -119,7 +120,7 @@ class InterpolateBetweenSections {
 			if (numFillers < 1)
 				return
 
-			val labelSet = unique(Views.iterable(section1), Views.iterable(section2))
+			val (labelSet, bboxes) = unique(section1, section2)
 			labelSet.remove(background)
 			val labels = longArrayOf(background) + labelSet.toArray()
 			LOG.debug("Interpolating between labels {}", labels)
@@ -128,12 +129,24 @@ class InterpolateBetweenSections {
 			val maxValForR = Util.getTypeFromInterval(distance11).createVariable()
 			maxValForR.setReal(maxValForR.maxValue)
 
+			LOG.debug("Processing {} labels", labels.size)
+
 			for (label in labels) {
 				if (label == background) continue
+				LOG.debug("Processing label={}", label)
 				val mask1 = Converters.convert(section1, { s, t -> t.set(s.integerLong == label) }, BoolType())
 				val mask2 = Converters.convert(section2, { s, t -> t.set(s.integerLong == label) }, BoolType())
 				signedDistanceTransform(mask1, distance11, distance12, distance11, postCalc, distanceType = distanceType, weights = *transformWeights)
 				signedDistanceTransform(mask2, distance21, distance22, distance21, postCalc, distanceType = distanceType, weights = *transformWeights)
+
+				val bbox = bboxes.get(label)
+				val nDim = mask1.numDimensions()
+				val min = LongArray(nDim)
+				val max = LongArray(nDim)
+				Arrays.setAll(min, {bbox[it]})
+				Arrays.setAll(max, {bbox[it+nDim]})
+
+				LOG.warn("Got bbox={} min={} max={} for label {}", bbox, min, max, label)
 
 				for (i in 1..numFillers) {
 
@@ -141,9 +154,9 @@ class InterpolateBetweenSections {
 					val w2 = 1.0 - w1
 					LOG.debug("Weights {} and {} for filler {} and label {} and type {}", w1, w2, i, label, Util.getTypeFromInterval(distance11).javaClass.simpleName)
 
-					val d1 = Views.flatIterable(distance11).cursor()
-					val d2 = Views.flatIterable(distance21).cursor()
-					val f = Views.flatIterable(fillers[i - 1]).cursor()
+					val d1 = Views.flatIterable(Views.interval(distance11, min, max)).cursor()
+					val d2 = Views.flatIterable(Views.interval(distance21, min, max)).cursor()
+					val f = Views.flatIterable(Views.interval(fillers[i - 1], min, max)).cursor()
 					while (d1.hasNext()) {
 						val d = w2 * d1.next().realDouble + w1 * d2.next().realDouble
 						val o = f.next()
@@ -192,7 +205,7 @@ class InterpolateBetweenSections {
 			if (numFillers < 1)
 				return
 
-			val labelSet = unique(Views.iterable(section1), Views.iterable(section2))
+			val (labelSet, bboxes) = unique(section1, section2)
 			labelSet.remove(background)
 			val labels = longArrayOf(background) + labelSet.toArray()
 
@@ -242,13 +255,39 @@ class InterpolateBetweenSections {
 
 		}
 
-		private fun <I : IntegerType<I>> unique(vararg data: Iterable<I>): TLongSet {
+		private fun <I : IntegerType<I>> unique(vararg data: RandomAccessibleInterval<I>): Pair<TLongHashSet, TLongObjectHashMap<LongArray>> {
 			val set = TLongHashSet()
+			val map = TLongObjectHashMap<LongArray>()
 
-			for (d in data)
-				for (i in d)
-					set.add(i.integerLong)
-			return set
+			for (d in data) {
+				val c = Views.iterable(d).localizingCursor()
+				val nDim = d.numDimensions()
+				while (c.hasNext()) {
+					val i = c.next().integerLong
+					set.add(i)
+					val bbox = map.get(i)
+					if (bbox == null) {
+						val newBox = LongArray(2 * nDim)
+						for (k in 0 until nDim)
+						{
+							val p = c.getLongPosition(k)
+							newBox[k] = p
+							newBox[k+nDim] = p
+						}
+						map.put(i, newBox)
+					}
+					else
+					{
+						for (k in 0 until nDim)
+						{
+							val p = c.getLongPosition(k)
+							if (p < bbox[k]) bbox[k] = p
+							if (p > bbox[k+nDim]) bbox[k+nDim] = p
+						}
+					}
+				}
+			}
+			return Pair(set, map)
 		}
 
 		private fun <R : RealType<R>> createAndInitializeWithValue(
