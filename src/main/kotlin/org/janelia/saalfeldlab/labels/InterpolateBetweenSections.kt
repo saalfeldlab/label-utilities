@@ -7,9 +7,7 @@ import net.imglib2.RandomAccessibleInterval
 import net.imglib2.algorithm.morphology.distance.DistanceTransform
 import net.imglib2.converter.Converters
 import net.imglib2.img.ImgFactory
-import net.imglib2.img.array.ArrayImg
 import net.imglib2.img.array.ArrayImgs
-import net.imglib2.img.basictypeaccess.array.LongArray
 import net.imglib2.loops.LoopBuilder
 import net.imglib2.type.BooleanType
 import net.imglib2.type.logic.BoolType
@@ -53,7 +51,7 @@ class InterpolateBetweenSections {
 		fun makeFillers(
 				numFillers: Long,
 				vararg dim: Long
-		): Array<ArrayImg<UnsignedLongType, LongArray>> {
+		): Array<RandomAccessibleInterval<UnsignedLongType>> {
 			return Stream
 					.generate { ArrayImgs.unsignedLongs(*dim) }
 					.limit(numFillers)
