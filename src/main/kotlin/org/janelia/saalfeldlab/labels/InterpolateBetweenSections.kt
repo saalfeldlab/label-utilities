@@ -41,6 +41,11 @@ class InterpolateBetweenSections {
 			checkNotNull(imgFactory)
 			checkNotNull(fillers)
 
+			val postCalc = when(distanceType) {
+				DistanceTransform.DISTANCE_TYPE.EUCLIDIAN -> { x: R -> x.setReal(Math.sqrt(x.realDouble)); x }
+				else -> { x: R -> x }
+			}
+
 			// include section1 and section2
 			val numFillers = fillers.size
 			val numSections = numFillers + 2
@@ -87,7 +92,7 @@ class InterpolateBetweenSections {
 					val f = Views.flatIterable(fillers[i - 1]).cursor()
 					val fd = Views.flatIterable(fillersDistances[i - 1]).cursor()
 					while (d1.hasNext()) {
-						val d = w2 * d1.next().realDouble + w1 * d2.next().realDouble
+						val d = w2 * postCalc(d1.next()).realDouble + w1 * postCalc(d2.next()).realDouble
 						val md = fd.next()
 						val abc = f.next()
 						if (md.realDouble > d) {
