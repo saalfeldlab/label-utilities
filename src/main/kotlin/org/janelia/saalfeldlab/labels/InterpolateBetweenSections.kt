@@ -174,9 +174,9 @@ private fun <B: BooleanType<B>, T: RealType<T>> signedDistanceTransform(
 			checkNotNull(imgFactory)
 			checkNotNull(fillers)
 
-			val postCalc = when(distanceType) {
-				DistanceTransform.DISTANCE_TYPE.EUCLIDIAN -> { x: R -> x.setReal(Math.sqrt(x.realDouble)); x }
-				else -> { x: R -> x }
+			val postCalc = when (distanceType) {
+				DistanceTransform.DISTANCE_TYPE.EUCLIDIAN -> { x: R -> x.setReal(Math.sqrt(x.realDouble)) }
+				else -> { _: R -> }
 			}
 
 			// include section1 and section2
@@ -187,10 +187,7 @@ private fun <B: BooleanType<B>, T: RealType<T>> signedDistanceTransform(
 
 			// nothing to do
 			if (numFillers < 1)
-				return;
-
-			val weightDelta = 1.0 / numSections
-			val weights = 1.rangeTo(numFillers + 1)
+				return
 
 			val labelSet = unique(Views.iterable(section1), Views.iterable(section2))
 			labelSet.remove(background)
@@ -201,18 +198,20 @@ private fun <B: BooleanType<B>, T: RealType<T>> signedDistanceTransform(
 			val maxValForR = Util.getTypeFromInterval(distances).createVariable()
 			maxValForR.setReal(maxValForR.maxValue)
 			val fillersDistances = Stream
-					.generate({ createAndInitializeWithValue(imgFactory, section1, maxValForR) })
+					.generate { createAndInitializeWithValue(imgFactory, section1, maxValForR) }
 					.limit(fillers.size.toLong())
 					.collect(Collectors.toList())
 
 			val dt1 = imgFactory.create(section1)
 			val dt2 = imgFactory.create(section2)
 
-			for(label in labels) {
+			for (label in labels) {
 				val mask1 = Converters.convert(section1, { s, t -> t.set(s.integerLong == label) }, BoolType())
 				val mask2 = Converters.convert(section2, { s, t -> t.set(s.integerLong == label) }, BoolType())
 				DistanceTransform.binaryTransform(mask1, dt1, distanceType, *transformWeights)
 				DistanceTransform.binaryTransform(mask2, dt2, distanceType, *transformWeights)
+				dt1.forEach(postCalc)
+				dt2.forEach(postCalc)
 
 				for (i in 1..numFillers) {
 
@@ -225,7 +224,7 @@ private fun <B: BooleanType<B>, T: RealType<T>> signedDistanceTransform(
 					val f = Views.flatIterable(fillers[i - 1]).cursor()
 					val fd = Views.flatIterable(fillersDistances[i - 1]).cursor()
 					while (d1.hasNext()) {
-						val d = w2 * postCalc(d1.next()).realDouble + w1 * postCalc(d2.next()).realDouble
+						val d = w2 * d1.next().realDouble + w1 * d2.next().realDouble
 						val md = fd.next()
 						val abc = f.next()
 						if (md.realDouble > d) {
