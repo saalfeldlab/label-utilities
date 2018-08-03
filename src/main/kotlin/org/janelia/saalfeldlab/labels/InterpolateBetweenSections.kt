@@ -7,6 +7,7 @@ import net.imglib2.RandomAccessibleInterval
 import net.imglib2.algorithm.morphology.distance.DistanceTransform
 import net.imglib2.converter.Converters
 import net.imglib2.img.ImgFactory
+import net.imglib2.loops.LoopBuilder
 import net.imglib2.type.BooleanType
 import net.imglib2.type.logic.BoolType
 import net.imglib2.type.numeric.IntegerType
@@ -33,16 +34,15 @@ class InterpolateBetweenSections {
 				mask: RandomAccessibleInterval<B>,
 				distanceOutside: RandomAccessibleInterval<T>,
 				distanceInside: RandomAccessibleInterval<T>,
-				postCalc: (T, T) -> Double,
+				distanceCombined: RandomAccessibleInterval<T>,
+				combine: (T, T) -> Double,
 				vararg weights: Double = doubleArrayOf(1.0),
 				distanceType: DistanceTransform.DISTANCE_TYPE = DistanceTransform.DISTANCE_TYPE.EUCLIDIAN
 		) {
 			LOG.debug("Got type {}", Util.getTypeFromInterval(distanceOutside).javaClass.simpleName)
 			DistanceTransform.binaryTransform(mask, distanceOutside, distanceOutside, distanceType, *weights)
 			DistanceTransform.binaryTransform(not(mask), distanceInside, distanceInside, distanceType, *weights)
-			val paired = Views.interval(Views.pair(distanceOutside, distanceInside), mask)
-			paired.forEach { it.a.setReal(postCalc(it.a, it.b)) }
-
+			LoopBuilder.setImages(distanceOutside, distanceInside, distanceCombined).forEachPixel(LoopBuilder.TriConsumer { o, i, c -> c.setReal(combine(o, i)) })
 		}
 
 		@JvmStatic
@@ -121,8 +121,8 @@ class InterpolateBetweenSections {
 				Views.iterable(distance22).forEach { it.setReal(Double.POSITIVE_INFINITY) }
 				val mask1 = Converters.convert(section1, { s, t -> t.set(s.integerLong == label) }, BoolType())
 				val mask2 = Converters.convert(section2, { s, t -> t.set(s.integerLong == label) }, BoolType())
-				signedDistanceTransform(mask1, distance11, distance12, postCalc, distanceType = distanceType, weights = *transformWeights)
-				signedDistanceTransform(mask2, distance21, distance22, postCalc, distanceType = distanceType, weights = *transformWeights)
+				signedDistanceTransform(mask1, distance11, distance12, distance11, postCalc, distanceType = distanceType, weights = *transformWeights)
+				signedDistanceTransform(mask2, distance21, distance22, distance21, postCalc, distanceType = distanceType, weights = *transformWeights)
 
 				for (i in 1..numFillers) {
 
