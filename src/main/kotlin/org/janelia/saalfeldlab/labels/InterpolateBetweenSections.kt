@@ -7,11 +7,15 @@ import net.imglib2.RandomAccessibleInterval
 import net.imglib2.algorithm.morphology.distance.DistanceTransform
 import net.imglib2.converter.Converters
 import net.imglib2.img.ImgFactory
+import net.imglib2.img.array.ArrayImg
+import net.imglib2.img.array.ArrayImgs
+import net.imglib2.img.basictypeaccess.array.LongArray
 import net.imglib2.loops.LoopBuilder
 import net.imglib2.type.BooleanType
 import net.imglib2.type.logic.BoolType
 import net.imglib2.type.numeric.IntegerType
 import net.imglib2.type.numeric.RealType
+import net.imglib2.type.numeric.integer.UnsignedLongType
 import net.imglib2.util.Util
 import net.imglib2.view.Views
 import org.slf4j.LoggerFactory
@@ -43,6 +47,18 @@ class InterpolateBetweenSections {
 			DistanceTransform.binaryTransform(mask, distanceOutside, distanceOutside, distanceType, *weights)
 			DistanceTransform.binaryTransform(not(mask), distanceInside, distanceInside, distanceType, *weights)
 			LoopBuilder.setImages(distanceOutside, distanceInside, distanceCombined).forEachPixel(LoopBuilder.TriConsumer { o, i, c -> c.setReal(combine(o, i)) })
+		}
+
+		@JvmStatic
+		fun makeFillers(
+				numFillers: Long,
+				vararg dim: Long
+		): Array<ArrayImg<UnsignedLongType, LongArray>> {
+			return Stream
+					.generate { ArrayImgs.unsignedLongs(*dim) }
+					.limit(numFillers)
+					.collect(Collectors.toList())
+					.toTypedArray()
 		}
 
 		@JvmStatic
