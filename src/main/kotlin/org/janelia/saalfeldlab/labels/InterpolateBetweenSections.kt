@@ -11,7 +11,6 @@ import net.imglib2.type.BooleanType
 import net.imglib2.type.logic.BoolType
 import net.imglib2.type.numeric.IntegerType
 import net.imglib2.type.numeric.RealType
-import net.imglib2.util.Pair
 import net.imglib2.util.Util
 import net.imglib2.view.Views
 import org.slf4j.LoggerFactory
@@ -24,34 +23,27 @@ class InterpolateBetweenSections {
 
 		private val LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
 
-private fun <B: BooleanType<B>> not(
-		mask: RandomAccessibleInterval<B>
-): RandomAccessibleInterval<B>
-{
-	return Converters.convert(mask, { s,t -> t.set(!s.get()) }, Util.getTypeFromInterval(mask).createVariable())!!
-}
+		private fun <B : BooleanType<B>> not(
+				mask: RandomAccessibleInterval<B>
+		): RandomAccessibleInterval<B> {
+			return Converters.convert(mask, { s, t -> t.set(!s.get()) }, Util.getTypeFromInterval(mask).createVariable())!!
+		}
 
-private fun<T: RealType<T>> difference(pairs: RandomAccessibleInterval<Pair<T, T>>, mod: (T) -> T): RandomAccessibleInterval<T> {
-	return Converters.convert(
-			pairs,
-			{ s,t -> t.set(mod(s.a)); t.sub(mod(s.b)) },
-			Util.getTypeFromInterval(pairs).a.createVariable())!!
-}
+		private fun <B : BooleanType<B>, T : RealType<T>> signedDistanceTransform(
+				mask: RandomAccessibleInterval<B>,
+				distanceOutside: RandomAccessibleInterval<T>,
+				distanceInside: RandomAccessibleInterval<T>,
+				postCalc: (T, T) -> Double,
+				vararg weights: Double = doubleArrayOf(1.0),
+				distanceType: DistanceTransform.DISTANCE_TYPE = DistanceTransform.DISTANCE_TYPE.EUCLIDIAN
+		) {
+			LOG.warn("Got type {}", Util.getTypeFromInterval(distanceOutside).javaClass.simpleName)
+			DistanceTransform.binaryTransform(mask, distanceOutside, distanceOutside, distanceType, *weights)
+			DistanceTransform.binaryTransform(not(mask), distanceInside, distanceInside, distanceType, *weights)
+			val paired = Views.interval(Views.pair(distanceOutside, distanceInside), mask)
+			paired.forEach { it.a.setReal(postCalc(it.a, it.b)) }
 
-private fun <B: BooleanType<B>, T: RealType<T>> signedDistanceTransform(
-		mask: RandomAccessibleInterval<B>,
-		distanceOutside: RandomAccessibleInterval<T>,
-		distanceInside: RandomAccessibleInterval<T>,
-		postCalc: (T) -> T,
-		vararg weights: Double = doubleArrayOf(1.0),
-		distanceType: DistanceTransform.DISTANCE_TYPE = DistanceTransform.DISTANCE_TYPE.EUCLIDIAN
-): RandomAccessibleInterval<T> {
-	DistanceTransform.binaryTransform(mask, distanceOutside, distanceType, *weights)
-	DistanceTransform.binaryTransform(not(mask), distanceInside, distanceType, *weights)
-	val paired= Views.interval(Views.pair(distanceOutside, distanceInside), mask)
-	return difference(paired, postCalc)
-
-}
+		}
 
 		@JvmStatic
 		fun <I : IntegerType<I>, R : RealType<R>> interpolateBetweenSectionsWithSignedDistanceTransform(
@@ -62,8 +54,7 @@ private fun <B: BooleanType<B>, T: RealType<T>> signedDistanceTransform(
 				distanceType: DistanceTransform.DISTANCE_TYPE = DistanceTransform.DISTANCE_TYPE.EUCLIDIAN,
 				transformWeights: DoubleArray = doubleArrayOf(1.0),
 				background: Long = 0
-		)
-		{
+		) {
 			interpolateBetweenSectionsWithSignedDistanceTransform(
 					section1,
 					section2,
@@ -98,9 +89,9 @@ private fun <B: BooleanType<B>, T: RealType<T>> signedDistanceTransform(
 			fillers.forEach { checkNotNull(it) }
 			checkNotNull(distanceType)
 
-			val postCalc = when(distanceType) {
-				DistanceTransform.DISTANCE_TYPE.EUCLIDIAN -> { x: R -> x.setReal(Math.sqrt(x.realDouble)); x }
-				else -> { x: R -> x }
+			val postCalc: (R, R) -> Double = when (distanceType) {
+				DistanceTransform.DISTANCE_TYPE.EUCLIDIAN -> { x, y -> Math.sqrt(x.realDouble) - Math.sqrt(y.realDouble) }
+				else -> { x, y -> x.realDouble - y.realDouble }
 			}
 
 
@@ -112,10 +103,7 @@ private fun <B: BooleanType<B>, T: RealType<T>> signedDistanceTransform(
 
 			// nothing to do
 			if (numFillers < 1)
-				return;
-
-			val weightDelta = 1.0 / numSections
-			val weights = 1.rangeTo(numFillers + 1)
+				return
 
 			val labelSet = unique(Views.iterable(section1), Views.iterable(section2))
 			labelSet.remove(background)
@@ -126,20 +114,24 @@ private fun <B: BooleanType<B>, T: RealType<T>> signedDistanceTransform(
 			val maxValForR = Util.getTypeFromInterval(distance11).createVariable()
 			maxValForR.setReal(maxValForR.maxValue)
 
-			for(label in labels) {
+			for (label in labels) {
+				Views.iterable(distance11).forEach { it.setReal(Double.POSITIVE_INFINITY) }
+				Views.iterable(distance12).forEach { it.setReal(Double.POSITIVE_INFINITY) }
+				Views.iterable(distance21).forEach { it.setReal(Double.POSITIVE_INFINITY) }
+				Views.iterable(distance22).forEach { it.setReal(Double.POSITIVE_INFINITY) }
 				val mask1 = Converters.convert(section1, { s, t -> t.set(s.integerLong == label) }, BoolType())
 				val mask2 = Converters.convert(section2, { s, t -> t.set(s.integerLong == label) }, BoolType())
-				val dt1 = signedDistanceTransform(mask1, distance11, distance12, postCalc, distanceType = distanceType, weights = *transformWeights)
-				val dt2 = signedDistanceTransform(mask2, distance21, distance22, postCalc, distanceType = distanceType, weights = *transformWeights)
+				signedDistanceTransform(mask1, distance11, distance12, postCalc, distanceType = distanceType, weights = *transformWeights)
+				signedDistanceTransform(mask2, distance21, distance22, postCalc, distanceType = distanceType, weights = *transformWeights)
 
 				for (i in 1..numFillers) {
 
 					val w1 = i.toDouble() / (numSections - 1).toDouble()
 					val w2 = 1.0 - w1
-					LOG.warn("Weights {} and {} for filler {} and label {}", w1, w2, i, label)
+					LOG.debug("Weights {} and {} for filler {} and label {} and type {}", w1, w2, i, label, Util.getTypeFromInterval(distance11).javaClass.simpleName)
 
-					val d1 = Views.flatIterable(dt1).cursor()
-					val d2 = Views.flatIterable(dt2).cursor()
+					val d1 = Views.flatIterable(distance11).cursor()
+					val d2 = Views.flatIterable(distance21).cursor()
 					val f = Views.flatIterable(fillers[i - 1]).cursor()
 					while (d1.hasNext()) {
 						val d = w2 * d1.next().realDouble + w1 * d2.next().realDouble
