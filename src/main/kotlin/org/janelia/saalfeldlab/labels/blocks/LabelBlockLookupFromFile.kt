@@ -9,12 +9,13 @@ import org.slf4j.LoggerFactory
 import java.lang.invoke.MethodHandles
 import java.nio.ByteBuffer
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.*
 import java.util.function.BiFunction
 
 @LabelBlockLookup.LookupType("from-file")
-class LabelBlockLookupFromFile(@Expose private val toFilePath: BiFunction<Int, Long, String?>) : LabelBlockLookup {
+class LabelBlockLookupFromFile(@Expose private val toFilePath: BiFunction<Int, Long, Path?>) : LabelBlockLookup {
 
 	companion object {
 		private val LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
@@ -25,16 +26,18 @@ class LabelBlockLookupFromFile(@Expose private val toFilePath: BiFunction<Int, L
 		// 2 : min and max
 		private const val SINGLE_ENTRY_BYTE_SIZE = 3 * 2 * java.lang.Long.BYTES
 
-		private fun fromPattern(pattern: String?): BiFunction<Int, Long, String?>
-		{
-			if (pattern == null)
-			{
-				return BiFunction{ _, _ -> null }
+		private fun fromPattern(pattern: String?): BiFunction<Int, Long, Path?> {
+			if (pattern == null) {
+				return BiFunction { _, _ -> null }
+			} else {
+				return BiFunction { level, id -> Paths.get(String.format(pattern, level, id)) }
 			}
-			else
-			{
-				return BiFunction{level, id -> String.format(pattern, level, id)}
-			}
+		}
+
+		@JvmStatic
+		@JvmOverloads
+		fun patternFromBasePath(basePath: String?, levelPattern: String = "s%d", idPattern: String = "%d"): String? {
+			return if (basePath == null) null else Paths.get(basePath, levelPattern, idPattern).toAbsolutePath().toString()
 		}
 
 	}
@@ -43,14 +46,14 @@ class LabelBlockLookupFromFile(@Expose private val toFilePath: BiFunction<Int, L
 
 	override fun read(level: Int, id: Long): Array<Interval> {
 
-		val path: String? = toFilePath.apply(level, id)
+		val path: Path? = toFilePath.apply(level, id)
 
 		if (path == null) {
 			LOG.warn("Invalid path, returning empty array: {}", path)
 			return EMPTY_ARRAY
 		}
 		try {
-			val bytes = Files.readAllBytes(Paths.get(path))
+			val bytes = Files.readAllBytes(path)
 			if (!isValidByteSize(bytes.size)) {
 				throw InvalidFileSize(bytes.size)
 			}
@@ -84,7 +87,7 @@ class LabelBlockLookupFromFile(@Expose private val toFilePath: BiFunction<Int, L
 
 	override fun write(level: Int, id: Long, vararg intervals: Interval) {
 
-		val path: String? = toFilePath.apply(level, id)
+		val path: Path? = toFilePath.apply(level, id)
 
 		if (path == null) {
 			LOG.info("Path is null, cannot write!")
@@ -104,9 +107,8 @@ class LabelBlockLookupFromFile(@Expose private val toFilePath: BiFunction<Int, L
 			bb.putLong(l2[1])
 			bb.putLong(l2[2])
 		}
-		val p = Paths.get(String.format(path!!, id))
-		Files.createDirectories(p.parent)
-		Files.write(p, data)
+		Files.createDirectories(path.parent)
+		Files.write(path, data)
 	}
 
 	private fun isValidByteSize(sizeInBytes: Int): Boolean {
