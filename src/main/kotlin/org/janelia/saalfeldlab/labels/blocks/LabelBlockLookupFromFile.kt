@@ -46,7 +46,9 @@ class LabelBlockLookupFromFile(@Expose private val toFilePath: BiFunction<Int, L
 
 	override fun read(level: Int, id: Long): Array<Interval> {
 
+		LOG.debug("Getting block list for id {} at level {}", id, level)
 		val path: Path? = toFilePath.apply(level, id)
+		LOG.debug("File path for block list for id {} at level {} is {}", id, level, path)
 
 		if (path == null) {
 			LOG.warn("Invalid path, returning empty array: {}", path)
