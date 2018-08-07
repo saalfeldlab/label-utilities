@@ -15,7 +15,7 @@ import java.util.*
 import java.util.function.BiFunction
 
 @LabelBlockLookup.LookupType("from-file")
-class LabelBlockLookupFromFile(@Expose private val toFilePath: BiFunction<Int, Long, Path?>) : LabelBlockLookup {
+class LabelBlockLookupFromFile(@Expose @LabelBlockLookup.Parameter private val pattern: String?) : LabelBlockLookup {
 
 	companion object {
 		private val LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
@@ -40,14 +40,17 @@ class LabelBlockLookupFromFile(@Expose private val toFilePath: BiFunction<Int, L
 			return if (basePath == null) null else Paths.get(basePath, levelPattern, idPattern).toAbsolutePath().toString()
 		}
 
-	}
+		private fun getPath(level: Int, id: Long, pattern: String?): Path?
+		{
+			return if (pattern == null) null else Paths.get(String.format(pattern, level, id))
+		}
 
-	constructor(pattern: String?) : this(fromPattern(pattern))
+	}
 
 	override fun read(level: Int, id: Long): Array<Interval> {
 
 		LOG.debug("Getting block list for id {} at level {}", id, level)
-		val path: Path? = toFilePath.apply(level, id)
+		val path: Path? = getPath(level, id, pattern)
 		LOG.debug("File path for block list for id {} at level {} is {}", id, level, path)
 
 		if (path == null) {
@@ -89,7 +92,7 @@ class LabelBlockLookupFromFile(@Expose private val toFilePath: BiFunction<Int, L
 
 	override fun write(level: Int, id: Long, vararg intervals: Interval) {
 
-		val path: Path? = toFilePath.apply(level, id)
+		val path: Path? = getPath(level, id, pattern)
 
 		if (path == null) {
 			LOG.info("Path is null, cannot write!")

@@ -31,7 +31,7 @@ interface LabelBlockLookup {
 	@Retention(RetentionPolicy.RUNTIME)
 	@Inherited
 	@Target(ElementType.FIELD)
-	annotation class CompressionParameter
+	annotation class Parameter
 
 	fun getType(): String? {
 		val compressionType = javaClass.getAnnotation(LookupType::class.java)
