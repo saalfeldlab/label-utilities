@@ -71,10 +71,12 @@ class HashWrapper<T : Any> @JvmOverloads constructor(
 		 */
 		private const val serialVersionUID = -2571523935606311437L
 
+		@JvmStatic
 		fun longArray(vararg array: Long): HashWrapper<LongArray> {
 			return HashWrapper(array, LongArrayHash(), LongArrayEquals())
 		}
 
+		@JvmStatic
 		fun interval(interval: Interval): HashWrapper<Interval> {
 			return interval(
 					interval,
@@ -83,7 +85,7 @@ class HashWrapper<T : Any> @JvmOverloads constructor(
 
 		}
 
-
+		@JvmStatic
 		fun interval(interval: Interval, toString: Function<Interval, String>): HashWrapper<Interval> {
 			val hash = LongArrayHash()
 			return HashWrapper(
