@@ -6,6 +6,7 @@ import net.imglib2.Dimensions
 import net.imglib2.RandomAccessibleInterval
 import net.imglib2.algorithm.morphology.distance.DistanceTransform
 import net.imglib2.converter.Converters
+import net.imglib2.converter.logical.Logical
 import net.imglib2.img.ImgFactory
 import net.imglib2.img.array.ArrayImgs
 import net.imglib2.loops.LoopBuilder
@@ -27,12 +28,6 @@ class InterpolateBetweenSections {
 
 		private val LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
 
-		private fun <B : BooleanType<B>> not(
-				mask: RandomAccessibleInterval<B>
-		): RandomAccessibleInterval<B> {
-			return Converters.convert(mask, { s, t -> t.set(!s.get()) }, Util.getTypeFromInterval(mask).createVariable())!!
-		}
-
 		private fun <B : BooleanType<B>, T : RealType<T>> signedDistanceTransform(
 				mask: RandomAccessibleInterval<B>,
 				distanceOutside: RandomAccessibleInterval<T>,
@@ -44,7 +39,7 @@ class InterpolateBetweenSections {
 		) {
 			LOG.debug("Got type {}", Util.getTypeFromInterval(distanceOutside).javaClass.simpleName)
 			DistanceTransform.binaryTransform(mask, distanceOutside, distanceOutside, distanceType, *weights)
-			DistanceTransform.binaryTransform(not(mask), distanceInside, distanceInside, distanceType, *weights)
+			DistanceTransform.binaryTransform(Logical.complement(mask), distanceInside, distanceInside, distanceType, *weights)
 			LoopBuilder.setImages(distanceOutside, distanceInside, distanceCombined).forEachPixel(LoopBuilder.TriConsumer { o, i, c -> c.setReal(combine(o, i)) })
 		}
 
