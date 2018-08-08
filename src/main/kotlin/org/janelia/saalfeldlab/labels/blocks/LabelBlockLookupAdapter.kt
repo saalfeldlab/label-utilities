@@ -3,7 +3,6 @@ package org.janelia.saalfeldlab.labels.blocks
 import com.google.gson.*
 import org.scijava.annotations.Index
 import org.slf4j.LoggerFactory
-import java.lang.annotation.ElementType
 import java.lang.invoke.MethodHandles
 import java.lang.reflect.Constructor
 import java.lang.reflect.Field
@@ -38,10 +37,10 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 			lookupParameters.clear()
 			val classLoader = Thread.currentThread().contextClassLoader
 			val annotationIndex = Index.load(LabelBlockLookup.LookupType::class.java, classLoader)
-			LOG.warn("Got annotation index {} with {} entries", annotationIndex, annotationIndex.iterator().asSequence().toList().size)
+			LOG.debug("Got annotation index {} with {} entries", annotationIndex, annotationIndex.iterator().asSequence().toList().size)
 
 			for (item in annotationIndex) {
-				LOG.warn("Looking at item {}", item.className())
+				LOG.debug("Looking at item {}", item.className())
 
 				try {
 					val clazz = Class.forName(item.className())
@@ -80,8 +79,8 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 
 			}
 
-			LOG.warn("Updated lookupConstructors {}", lookupConstructors)
-			LOG.warn("Updated lookupParameters {}", lookupParameters)
+			LOG.debug("Updated lookupConstructors {}", lookupConstructors)
+			LOG.debug("Updated lookupParameters {}", lookupParameters)
 
 		}
 
