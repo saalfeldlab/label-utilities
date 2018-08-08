@@ -1,5 +1,6 @@
 package org.janelia.saalfeldlab.labels.blocks
 
+import com.google.gson.annotations.Expose
 import net.imglib2.FinalInterval
 import net.imglib2.Interval
 import net.imglib2.util.Intervals
@@ -13,10 +14,14 @@ import java.util.function.Consumer
 import java.util.stream.Collectors
 import java.util.stream.Stream
 
+@LabelBlockLookup.LookupType("n5-filesystem")
 class LabelBlockLookupFromN5(
-		private val n5: N5FSWriter,
-		private val scaleDatasetPattern: String,
-		private val exceptionHandler: Consumer<IOException> = Consumer { LOG.warn("Caught exception in read/write. Defaulting to no-op", it) }) : LabelBlockLookup {
+		@LabelBlockLookup.Parameter private val root: String,
+		@LabelBlockLookup.Parameter private val scaleDatasetPattern: String) : LabelBlockLookup {
+
+	private constructor(): this("", "")
+
+	private var n5: N5FSWriter? = null
 
 	companion object {
 		private val LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
@@ -71,57 +76,50 @@ class LabelBlockLookupFromN5(
 
 	private val attributes = mutableMapOf<Int, DatasetAttributes>()
 
+
+	@Throws(IOException::class)
 	fun set(level: Int, ids: Map<Long, Array<Interval>>) {
 
 
-		try {
-			val dataset = String.format(scaleDatasetPattern, level)
-			val attributes = this.attributes.getOrPut(level, { n5.getDatasetAttributes(dataset) })
-			val stepSize = attributes.blockSize[0]
+		val dataset = String.format(scaleDatasetPattern, level)
+		val attributes = this.attributes.getOrPut(level, { n5().getDatasetAttributes(dataset) })
+		val stepSize = attributes.blockSize[0]
 
-			val mapByBlock = mutableMapOf<Long, MutableMap<Long, Array<Interval>>>()
+		val mapByBlock = mutableMapOf<Long, MutableMap<Long, Array<Interval>>>()
 
-			for (entry in ids)
-				mapByBlock.computeIfAbsent((entry.key / stepSize) * stepSize, { mutableMapOf() })[entry.key] = entry.value
+		for (entry in ids)
+			mapByBlock.computeIfAbsent((entry.key / stepSize) * stepSize, { mutableMapOf() })[entry.key] = entry.value
 
-			for (m in mapByBlock)
-				writeMap(level, m.key, m.value)
-		} catch (e: IOException) {
-			exceptionHandler.accept(e)
-		}
+		for (m in mapByBlock)
+			writeMap(level, m.key, m.value)
 
 	}
 
+
+	@Throws(IOException::class)
 	override fun read(level: Int, id: Long): Array<Interval> {
-		try {
-			val map = readMap(level, id) ?: mutableMapOf()
-			return map.getOrElse(id, { emptyArray() })
-		} catch (e: IOException) {
-			exceptionHandler.accept(e)
-			return emptyArray()
-		}
+		val map = readMap(level, id) ?: mutableMapOf()
+		return map.getOrElse(id, { emptyArray() })
 
 	}
 
+
+	@Throws(IOException::class)
 	override fun write(level: Int, id: Long, vararg intervals: Interval) {
-		try {
-			val map = readMap(level, id) ?: mutableMapOf()
-			map[id] = arrayOf(*intervals)
-			writeMap(level, id, map)
-		} catch (e: IOException) {
-			exceptionHandler.accept(e)
-		}
+		val map = readMap(level, id) ?: mutableMapOf()
+		map[id] = arrayOf(*intervals)
+		writeMap(level, id, map)
 	}
 
 	@Throws(IOException::class)
 	private fun readMap(level: Int, id: Long): MutableMap<Long, Array<Interval>>? {
 		val dataset = "${String.format(scaleDatasetPattern, level)}"
-		val attributes = this.attributes.getOrPut(level, { n5.getDatasetAttributes(dataset) })
+		val attributes = this.attributes.getOrPut(level, { n5().getDatasetAttributes(dataset) })
 
 		val blockSize = attributes.blockSize[0]
 		val blockId = id / blockSize
 
-		val block = n5.readBlock(dataset, attributes, longArrayOf(blockId)) as? ByteArrayDataBlock
+		val block = n5().readBlock(dataset, attributes, longArrayOf(blockId)) as? ByteArrayDataBlock
 
 		if (block == null) {
 			LOG.warn("Did not find any data, returning empty array")
@@ -136,14 +134,20 @@ class LabelBlockLookupFromN5(
 	private fun writeMap(level: Int, id: Long, map: Map<Long, Array<Interval>>) {
 		val dataset = "${String.format(scaleDatasetPattern, level)}"
 
-		val attributes = this.attributes.getOrPut(level, { n5.getDatasetAttributes(dataset) })
+		val attributes = this.attributes.getOrPut(level, { n5().getDatasetAttributes(dataset) })
 		val size = intArrayOf(attributes.blockSize[0])
 
 		val blockSize = attributes.blockSize[0]
 		val blockId = id / blockSize
 
 		val block = ByteArrayDataBlock(size, longArrayOf(blockId), toBytes(map))
-		n5.writeBlock(dataset, attributes, block)
+		n5().writeBlock(dataset, attributes, block)
+	}
+
+	private fun n5(): N5FSWriter {
+		if (n5 == null)
+			n5 = N5FSWriter(root)
+		return n5!!
 	}
 
 }
@@ -153,7 +157,7 @@ fun main(args: Array<String>) {
 	val basePath = "bla-test"
 	val pattern = "label-to-block-mapping/s%d"
 	val writer = N5FSWriter(basePath)
-	val lookup = LabelBlockLookupFromN5(writer, pattern)
+	val lookup = LabelBlockLookupFromN5(basePath, pattern)
 
 	writer.createDataset(String.format(pattern, level), DatasetAttributes(longArrayOf(100), intArrayOf(3), DataType.INT8, GzipCompression()))
 

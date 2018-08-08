@@ -1,40 +1,39 @@
 package org.janelia.saalfeldlab.labels.blocks
 
 import net.imglib2.Interval
-import net.imglib2.loops.LoopBuilder
 import org.scijava.annotations.Indexable
-import java.lang.annotation.*
-import java.lang.annotation.Retention
-import java.lang.annotation.Target
-import java.util.function.BiFunction
+import java.io.IOException
+import java.lang.annotation.Inherited
 
 interface LabelBlockLookup {
 
+	@Throws(IOException::class)
 	fun read(level: Int, id: Long): Array<Interval>
 
+	@Throws(IOException::class)
 	fun write(level: Int, id: Long, vararg intervals: Interval)
 
 	/**
 	 * Annotation for runtime discovery of compression schemes.
 	 *
 	 */
-	@Retention(RetentionPolicy.RUNTIME)
-	@Inherited
-	@Target(ElementType.TYPE)
+	@Retention(AnnotationRetention.RUNTIME)
+	@Target(AnnotationTarget.CLASS)
 	@Indexable
+	@Inherited
 	annotation class LookupType(val value: String)
 
 	/**
 	 * Annotation for runtime discovery of compression schemes.
 	 *
 	 */
-	@Retention(RetentionPolicy.RUNTIME)
+	@Retention(AnnotationRetention.RUNTIME)
+	@Target(AnnotationTarget.PROPERTY)
 	@Inherited
-	@Target(ElementType.FIELD)
 	annotation class Parameter
 
-	fun getType(): String? {
+	fun getType(): String {
 		val compressionType = javaClass.getAnnotation(LookupType::class.java)
-		return compressionType?.value
+		return compressionType!!.value
 	}
 }

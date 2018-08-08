@@ -1,6 +1,5 @@
 package org.janelia.saalfeldlab.labels.blocks
 
-import com.google.gson.annotations.Expose
 import net.imglib2.FinalInterval
 import net.imglib2.Interval
 import net.imglib2.util.Intervals
@@ -15,7 +14,9 @@ import java.util.*
 import java.util.function.BiFunction
 
 @LabelBlockLookup.LookupType("from-file")
-class LabelBlockLookupFromFile(@Expose @LabelBlockLookup.Parameter private val pattern: String?) : LabelBlockLookup {
+class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: String) : LabelBlockLookup {
+
+	private constructor(): this("")
 
 	companion object {
 		private val LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
