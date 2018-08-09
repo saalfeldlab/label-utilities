@@ -84,6 +84,7 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 
 		}
 
+		@JvmStatic
 		fun getJsonAdapter(): LabelBlockLookupAdapter {
 			if (lookupParameters.size == 0) {
 				update()
