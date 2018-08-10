@@ -141,7 +141,7 @@ class InterpolateBetweenSections {
 				Arrays.setAll(min, {bbox[it]})
 				Arrays.setAll(max, {bbox[it+nDim]})
 
-				LOG.warn("Got bbox={} min={} max={} for label {}", bbox, min, max, label)
+				LOG.debug("Got bbox={} min={} max={} for label {}", bbox, min, max, label)
 
 				for (i in 1..numFillers) {
 
