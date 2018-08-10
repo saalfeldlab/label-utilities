@@ -51,7 +51,7 @@ class InterpolateBetweenSections {
 			return Stream
 					.generate { ArrayImgs.unsignedLongs(*dim) }
 					.limit(numFillers)
-					.collect(Collectors.toList())
+					.collect(Collectors.toList<RandomAccessibleInterval<UnsignedLongType>>())
 					.toTypedArray()
 		}
 
