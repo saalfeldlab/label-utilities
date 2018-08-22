@@ -55,7 +55,7 @@ class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: 
 		LOG.debug("File path for block list for id {} at level {} is {}", id, level, path)
 
 		if (path == null) {
-			LOG.warn("Invalid path, returning empty array: {}", path)
+			LOG.debug("Invalid path, returning empty array: {}", path)
 			return EMPTY_ARRAY
 		}
 		try {

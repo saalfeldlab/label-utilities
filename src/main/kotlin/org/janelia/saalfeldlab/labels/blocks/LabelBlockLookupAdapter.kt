@@ -114,6 +114,7 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 				json.add(name, context.serialize(value))
 			}
 
+			LOG.debug("Serialized lookup to {}", json);
 			return json
 		} catch (e: SecurityException) {
 			e.printStackTrace(System.err)

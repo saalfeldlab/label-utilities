@@ -98,6 +98,7 @@ class LabelBlockLookupFromN5(
 
 	@Throws(IOException::class)
 	override fun read(level: Int, id: Long): Array<Interval> {
+		LOG.debug("Reading id {} for level={}", id, level);
 		val map = readMap(level, id) ?: mutableMapOf()
 		return map.getOrElse(id, { emptyArray() })
 
