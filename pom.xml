@@ -32,7 +32,7 @@
 	<mailingLists>
 		<mailingList>
 			<name>ImageJ Forum</name>
-			<archive>http://forum.imagej.net/</archive>
+			<archive>http://forum.image.sc/</archive>
 		</mailingList>
 	</mailingLists>
 
@@ -60,14 +60,14 @@
 	</contributors>
 
 	<scm>
-		<connection>scm:git:git://github.com/saalfeldlab/label-utilities-spark</connection>
-		<developerConnection>scm:git:git@github.com:saalfeldlab/label-utilities-spark</developerConnection>
+		<connection>scm:git:git://github.com/saalfeldlab/label-utilities</connection>
+		<developerConnection>scm:git:git@github.com:saalfeldlab/label-utilities</developerConnection>
 		<tag>HEAD</tag>
-		<url>https://github.com/saalfeldlab/label-utilities-spark</url>
+		<url>https://github.com/saalfeldlab/label-utilities</url>
 	</scm>
 	<issueManagement>
 		<system>GitHub Issues</system>
-		<url>https://github.com/saalfeldlab/label-utilities-spark/issues</url>
+		<url>https://github.com/saalfeldlab/label-utilities/issues</url>
 	</issueManagement>
 	<ciManagement>
 		<system>None</system>
@@ -75,9 +75,6 @@
 
 
 	<properties>
-		<scijava.jvm.version>1.8</scijava.jvm.version>
-		<allowedDuplicateClasses>*</allowedDuplicateClasses>
-
 		<license.licenseName>bsd_2</license.licenseName>
 		<license.copyrightOwners>Stephan Saalfeld</license.copyrightOwners>
 	</properties>
