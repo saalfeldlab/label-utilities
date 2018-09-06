@@ -195,22 +195,3 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 	}
 
 }
-
-fun main(args: Array<String>) {
-	val gson = GsonBuilder()
-			.registerTypeHierarchyAdapter(LabelBlockLookup::class.java, LabelBlockLookupAdapter.getJsonAdapter())
-			.setPrettyPrinting()
-			.create()
-
-	val fromFile = LabelBlockLookupFromFile("123")
-	val serialized = gson.toJson(fromFile)
-	println("${serialized}")
-	println("${gson.toJson(gson.fromJson(serialized, LabelBlockLookup::class.java))}")
-	println()
-
-	val fromN5 = LabelBlockLookupFromN5("123", "456/%d")
-	val serializedN5 = gson.toJson(fromN5)
-	println("${serializedN5}")
-	println("${gson.toJson(gson.fromJson(serializedN5, LabelBlockLookup::class.java))}")
-
-}
