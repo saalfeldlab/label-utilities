@@ -81,7 +81,7 @@ class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: 
 					.toArray { arrayOfNulls<Interval>(it) }
 
 		} catch (e: Exception) {
-			LOG.error(
+			LOG.debug(
 					"Unable to read data from file at {} for level and id {} -- returning empty array: " + "{}",
 					path, level, id,
 					e.message, e
