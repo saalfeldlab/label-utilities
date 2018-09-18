@@ -1,6 +1,4 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
@@ -11,7 +9,7 @@
 
 	<groupId>org.janelia.saalfeldlab</groupId>
 	<artifactId>label-utilities</artifactId>
-	<version>0.2.1-SNAPSHOT</version>
+	<version>0.2.1</version>
 
 	<name>Label Utilities</name>
 	<description>Tools for label data.</description>
@@ -62,7 +60,7 @@
 	<scm>
 		<connection>scm:git:git://github.com/saalfeldlab/label-utilities</connection>
 		<developerConnection>scm:git:git@github.com:saalfeldlab/label-utilities</developerConnection>
-		<tag>HEAD</tag>
+		<tag>label-utilities-0.2.1</tag>
 		<url>https://github.com/saalfeldlab/label-utilities</url>
 	</scm>
 	<issueManagement>
