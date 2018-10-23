@@ -23,6 +23,18 @@ import java.util.*
 import java.util.stream.Collectors
 import java.util.stream.Stream
 
+/**
+ *
+ * Interpolates between two sections/blocks of label data.
+ *
+ * Interpolate between n-dimensional boxes of label data. Initially, this was meant for two-dimensional sections but
+ * it generalizes to arbitrary dimensionality. Section and boxes mean the same in this context and will be used
+ * interchangeably.
+ *
+ * Calculate the signed distance transforms in each of a pair of sections for all elements in the union of sets of
+ * contained label ids of each section. Then, interpolate between those distance transforms linearly and set the
+ * label id of the interpolated section as the arg max over the interpolated distance transforms for all labels.
+ */
 class InterpolateBetweenSections {
 	companion object {
 
@@ -43,6 +55,12 @@ class InterpolateBetweenSections {
 			LoopBuilder.setImages(distanceOutside, distanceInside, distanceCombined).forEachPixel(LoopBuilder.TriConsumer { o, i, c -> c.setReal(combine(o, i)) })
 		}
 
+		/**
+		 * Helper method to create a list of [ArrayImg].
+		 *
+		 * @param numFillers number of images to create.
+		 * @param dim size of each image
+		 */
 		@JvmStatic
 		fun makeFillers(
 				numFillers: Long,
@@ -55,6 +73,24 @@ class InterpolateBetweenSections {
 					.toTypedArray()
 		}
 
+		/**
+		 * Interpolate between two sections of label data
+		 * Calculate the signed distance transforms in each of a pair of sections for all elements in the union of sets of
+		 * contained label ids of each section. Then, interpolate between those distance transforms linearly and set the
+		 * label id of the interpolated section as the arg max over the interpolated distance transforms for all labels.
+		 *
+		 *
+		 *
+		 * @param section1 first label section
+		 * @param section2 second label section
+		 * @param distanceFactory creates storage images for temporary data
+		 * @param fillers targets to be filled with interpolated labels. The [fillers] are distributed equidistantly between
+		 * [section1] and [section2].
+		 * @param distanceType what kind of distance transform to use, [DistanceTransform.DISTANCE_TYPE.EUCLIDIAN] or
+		 * [DistanceTransform.DISTANCE_TYPE.L1]
+		 * @param transformWeights weights are used to account for anisotropic in distance transform. Defaults to 1.0.
+		 * @param background value of background
+		 */
 		@JvmStatic
 		fun <I : IntegerType<I>, R : RealType<R>> interpolateBetweenSectionsWithSignedDistanceTransform(
 				section1: RandomAccessibleInterval<I>,
@@ -79,6 +115,28 @@ class InterpolateBetweenSections {
 			)
 		}
 
+
+		/**
+		 * Interpolate between two sections of label data
+		 * Calculate the signed distance transforms in each of a pair of sections for all elements in the union of sets of
+		 * contained label ids of each section. Then, interpolate between those distance transforms linearly and set the
+		 * label id of the interpolated section as the arg max over the interpolated distance transforms for all labels.
+		 *
+		 *
+		 *
+		 * @param section1 first label section
+		 * @param section2 second label section
+		 * @param distance11 store for temporary data
+		 * @param distance12 store for temporary data
+		 * @param distance21 store for temporary data
+		 * @param distance22 store for temporary data
+		 * @param fillers targets to be filled with interpolated labels. The [fillers] are distributed equidistantly between
+		 * [section1] and [section2]
+		 * @param distanceType what kind of distance transform to use, [DistanceTransform.DISTANCE_TYPE.EUCLIDIAN] or
+		 * [DistanceTransform.DISTANCE_TYPE.L1]
+		 * @param transformWeights weights are used to account for anisotropic in distance transform. defaults to 1.0.
+		 * @param background value of background
+		 */
 		@JvmStatic
 		fun <I : IntegerType<I>, R : RealType<R>> interpolateBetweenSectionsWithSignedDistanceTransform(
 				section1: RandomAccessibleInterval<I>,
@@ -167,7 +225,23 @@ class InterpolateBetweenSections {
 		}
 
 		/**
-		 * filler distances should be initialized to infinity
+		 * Interpolate between two sections of label data
+		 * Calculate the unsigned distance transforms in each of a pair of sections for all elements in the union of sets of
+		 * contained label ids of each section. Then, interpolate between those distance transforms linearly and set the
+		 * label id of the interpolated section as the arg max over the interpolated distance transforms for all labels.
+		 *
+		 * Equivalent to [interpolateBetweenSectionsWithSignedDistanceTransform] but uses unsigned distance transform instead.
+		 *
+		 *
+		 * @param section1 first label section
+		 * @param section2 second label section
+		 * @param distanceFactory creates storage images for temporary data
+		 * @param fillers targets to be filled with interpolated labels. The [fillers] are distributed equidistantly between
+		 * [section1] and [section2]
+		 * @param distanceType what kind of distance transform to use, [DistanceTransform.DISTANCE_TYPE.EUCLIDIAN] or
+		 * [DistanceTransform.DISTANCE_TYPE.L1]
+		 * @param transformWeights weights are used to account for anisotropic in distance transform. defaults to 1.0.
+		 * @param background value of background
 		 */
 		@JvmStatic
 		fun <I : IntegerType<I>, R : RealType<R>> interpolateBetweenSections(
