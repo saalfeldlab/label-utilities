@@ -99,7 +99,8 @@ class InterpolateBetweenSections {
 				vararg fillers: RandomAccessibleInterval<I>,
 				distanceType: DistanceTransform.DISTANCE_TYPE = DistanceTransform.DISTANCE_TYPE.EUCLIDIAN,
 				transformWeights: DoubleArray = doubleArrayOf(1.0),
-				background: Long = 0
+				background: Long = 0,
+				weightForFiller: (Int) -> Double = {it.toDouble() / (fillers.size + 1).toDouble()}
 		) {
 			interpolateBetweenSectionsWithSignedDistanceTransform(
 					section1,
@@ -111,7 +112,8 @@ class InterpolateBetweenSections {
 					*fillers,
 					distanceType = distanceType,
 					transformWeights = transformWeights,
-					background = background
+					background = background,
+					weightForFiller = weightForFiller
 			)
 		}
 
@@ -136,6 +138,8 @@ class InterpolateBetweenSections {
 		 * [DistanceTransform.DISTANCE_TYPE.L1]
 		 * @param transformWeights weights are used to account for anisotropic in distance transform. defaults to 1.0.
 		 * @param background value of background
+		 * @param weightForFiller specify the weight for interpolating into filler at index, starting at 1. If nothing
+		 * specified, space between sections will be filled with fillers in an equidistant fashion.
 		 */
 		@JvmStatic
 		fun <I : IntegerType<I>, R : RealType<R>> interpolateBetweenSectionsWithSignedDistanceTransform(
@@ -148,7 +152,8 @@ class InterpolateBetweenSections {
 				vararg fillers: RandomAccessibleInterval<I>,
 				distanceType: DistanceTransform.DISTANCE_TYPE = DistanceTransform.DISTANCE_TYPE.EUCLIDIAN,
 				transformWeights: DoubleArray = doubleArrayOf(1.0),
-				background: Long = 0
+				background: Long = 0,
+				weightForFiller: (Int) -> Double = {it.toDouble() / (fillers.size + 1).toDouble()}
 		) {
 
 			checkNotNull(section1)
@@ -203,7 +208,7 @@ class InterpolateBetweenSections {
 
 				for (i in 1..numFillers) {
 
-					val w1 = i.toDouble() / (numSections - 1).toDouble()
+					val w1 = weightForFiller(i)
 					val w2 = 1.0 - w1
 					LOG.debug("Weights {} and {} for filler {} and label {} and type {}", w1, w2, i, label, Util.getTypeFromInterval(distance11).javaClass.simpleName)
 
@@ -220,8 +225,6 @@ class InterpolateBetweenSections {
 				}
 
 			}
-
-
 		}
 
 		/**
