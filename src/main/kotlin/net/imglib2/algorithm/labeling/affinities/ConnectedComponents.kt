@@ -53,7 +53,7 @@ class ConnectedComponents {
 				vararg steps: LongArray,
 				unionFind: UnionFind = IntArrayUnionFind(Intervals.numElements(labels).toInt()),
 				toIndex: (Localizable) -> Long = { IntervalIndexer.positionToIndex(it, labels) }
-		) {
+		): Long {
 
 			if (!Views.isZeroMin(labels))
 				return fromSymmetricAffinities(
@@ -66,7 +66,7 @@ class ConnectedComponents {
 						toIndex = toIndex)
 
 			unionFindFromSymmetricAffinities(foreground, Views.interval(affinities, labels), unionFind, threshold, *steps, toIndex = toIndex)
-			relabel(Views.interval(foreground, labels), labels, unionFind, toIndex)
+			return relabel(Views.interval(foreground, labels), labels, unionFind, toIndex)
 		}
 
 		@JvmStatic
@@ -74,14 +74,22 @@ class ConnectedComponents {
 				mask: RandomAccessibleInterval<B>,
 				labels: RandomAccessibleInterval<L>,
 				unionFind: UnionFind,
-				toIndex: (Localizable) -> Long) {
+				toIndex: (Localizable) -> Long,
+				indexToId: (Long) -> Long = {it+1})
+		: Long {
 			val c = Views.flatIterable(labels).cursor()
 			val b = Views.flatIterable(mask).cursor()
+			var maxId = Long.MIN_VALUE
 			while (c.hasNext()) {
 				val p = c.next()
-				if (b.next().get())
-					p.setInteger(unionFind.findRoot(toIndex(c)))
+				if (b.next().get()) {
+					val id = indexToId(unionFind.findRoot(toIndex(c)))
+					p.setInteger(id)
+					if (id > maxId)
+						maxId = id
+				}
 			}
+			return maxId
 		}
 
 		@JvmStatic
@@ -146,48 +154,45 @@ class ConnectedComponents {
 				toIndex: (Localizable) -> Long
 		) {
 
-			if (steps.size != affinities.numDimensions())
-				throw IllegalArgumentException("Need on step size for each dimension but got steps ${Arrays.toString(steps)} " +
-						"and dimensions ${Arrays.toString(Intervals.dimensionsAsLongArray(affinities))}")
+			for (step in steps)
+				if (step.size != affinities.numDimensions())
+					throw IllegalArgumentException("Need on step size for each dimension but got steps ${Arrays.toString(steps)} " +
+							"and dimensions ${Arrays.toString(Intervals.dimensionsAsLongArray(affinities))}")
 
-			var accumulator = 0L
-			for (dim in steps.indices) {
-				for (step in steps[dim]) {
-					val currentPixelMask = Views.interval(foreground, affinities)
-					val shiftedPixelMask = Views.interval(foreground, Intervals.translate(affinities, step, dim))
-					val cCursor = Views.flatIterable(currentPixelMask).cursor()
-					val sCursor = Views.flatIterable(shiftedPixelMask).cursor()
-					val aCursor = Views.flatIterable(affinities).cursor()
+			for (stepIndex in steps.indices) {
+				val currentPixelMask = Views.interval(foreground, affinities)
+				val shiftedPixelMask = Views.interval(foreground, Views.translate(affinities, *steps[stepIndex]))
+				val cCursor = Views.flatIterable(currentPixelMask).cursor()
+				val sCursor = Views.flatIterable(shiftedPixelMask).cursor()
+				val aCursor = Views.flatIterable(affinities).cursor()
 
-					while (aCursor.hasNext()) {
-						cCursor.fwd()
-						sCursor.fwd()
-						aCursor.fwd()
+				val stepIndexLong = stepIndex.toLong()
 
-						val c = cCursor.get().get()
-						if (!c)
-							continue
+				while (aCursor.hasNext()) {
+					cCursor.fwd()
+					sCursor.fwd()
+					aCursor.fwd()
 
-						val s = sCursor.get().get()
-						if (!s)
-							continue
+					val c = cCursor.get().get()
+					if (!c)
+						continue
 
-						val a = aCursor.get().get(accumulator).realDouble
-						if (a.isNaN() || a < threshold)
-							continue
+					val s = sCursor.get().get()
+					if (!s)
+						continue
 
-						val r1 = unionFind.findRoot(toIndex(cCursor))
-						val r2 = unionFind.findRoot(toIndex(sCursor))
+					val a = aCursor.get().get(stepIndexLong).realDouble
+					if (a.isNaN() || a < threshold)
+						continue
 
-						if (r1 != r2)
-							unionFind.join(r1, r2)
+					val r1 = unionFind.findRoot(toIndex(cCursor))
+					val r2 = unionFind.findRoot(toIndex(sCursor))
 
-					}
-
-					++accumulator
-					println("accumulator is $accumulator $dim $step")
+					if (r1 != r2)
+						unionFind.join(r1, r2)
 
 				}
+
 			}
 
 		}
