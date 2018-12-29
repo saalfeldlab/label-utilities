@@ -233,8 +233,8 @@ class ConnectedComponents {
 
 		}
 
-		private fun LongArray.invertValues(): LongArray {
-			return LongArray(this.size, {-this[it]})
+		private fun LongArray.invertValues(max: Long = 0): LongArray {
+			return LongArray(this.size, {max-this[it]})
 		}
 
 	}
