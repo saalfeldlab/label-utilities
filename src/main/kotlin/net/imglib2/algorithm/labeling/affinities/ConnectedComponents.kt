@@ -20,6 +20,7 @@ class ConnectedComponents {
 	companion object {
 
 		@JvmStatic
+		@JvmOverloads
 		fun <B: BooleanType<B>, U: BooleanType<U>, R: RealType<R>, C: Composite<R>, L: IntegerType<L>> fromSymmetricAffinities(
 				foreground: RandomAccessible<B>,
 				affinities: RandomAccessible<C>,
@@ -47,6 +48,7 @@ class ConnectedComponents {
 		}
 
 		@JvmStatic
+		@JvmOverloads
 		fun <B: BooleanType<B>, U: BooleanType<U>, R: RealType<R>, C: Composite<R>, L: IntegerType<L>> fromSymmetricAffinities(
 				foreground: RandomAccessible<B>,
 				affinities: RandomAccessible<C>,
@@ -74,6 +76,7 @@ class ConnectedComponents {
 		}
 
 		@JvmStatic
+		@JvmOverloads
 		fun <B: BooleanType<B>, U: BooleanType<U>, L: IntegerType<L>> relabel(
 				mask: RandomAccessibleInterval<B>,
 				labels: RandomAccessibleInterval<L>,
@@ -101,6 +104,7 @@ class ConnectedComponents {
 		}
 
 		@JvmStatic
+		@JvmOverloads
 		fun <B: BooleanType<B>, U: BooleanType<U>, R: RealType<R>, C: Composite<R>> unionFindFromSymmetricAffinities(
 				foreground: RandomAccessible<B>,
 				affinities: RandomAccessibleInterval<C>,
@@ -167,6 +171,7 @@ class ConnectedComponents {
 		}
 
 		@JvmStatic
+		@JvmOverloads
 		fun <B: BooleanType<B>, U: BooleanType<U>, R: RealType<R>, C: Composite<R>> unionFindFromSymmetricAffinities(
 				foreground: RandomAccessible<B>,
 				affinities: RandomAccessibleInterval<C>,
