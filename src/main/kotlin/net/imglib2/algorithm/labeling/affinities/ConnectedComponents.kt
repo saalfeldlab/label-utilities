@@ -1,7 +1,6 @@
 package net.imglib2.algorithm.labeling.affinities
 
 import net.imglib2.Localizable
-import net.imglib2.Point
 import net.imglib2.RandomAccessible
 import net.imglib2.RandomAccessibleInterval
 import net.imglib2.algorithm.util.unionfind.IntArrayUnionFind
@@ -28,34 +27,7 @@ class ConnectedComponents {
 				unionMask: RandomAccessible<U>,
 				threshold: Double,
 				vararg steps: Long,
-				unionFind: UnionFind = IntArrayUnionFind(Intervals.numElements(labels).toInt()),
-				toIndex: (Localizable) -> Long = { IntervalIndexer.positionToIndex(it, labels) }
-		) {
-
-			if (!Views.isZeroMin(labels))
-				return fromSymmetricAffinities(
-						Views.translate(foreground, *Intervals.minAsLongArray(labels).invertValues()),
-						Views.translate(affinities, *Intervals.minAsLongArray(labels).invertValues()),
-						Views.zeroMin(labels),
-						Views.translate(unionMask, *Intervals.minAsLongArray(labels).invertValues()),
-						threshold,
-						*steps,
-						unionFind = unionFind,
-						toIndex = toIndex)
-
-			unionFindFromSymmetricAffinities(foreground, Views.interval(affinities, labels), unionMask, unionFind, threshold, *steps, toIndex = toIndex)
-			relabel(Views.interval(foreground, labels), labels, Views.interval(unionMask, labels), unionFind, toIndex)
-		}
-
-		@JvmStatic
-		@JvmOverloads
-		fun <B: BooleanType<B>, U: BooleanType<U>, R: RealType<R>, C: Composite<R>, L: IntegerType<L>> fromSymmetricAffinities(
-				foreground: RandomAccessible<B>,
-				affinities: RandomAccessible<C>,
-				labels: RandomAccessibleInterval<L>,
-				unionMask: RandomAccessible<U>,
-				threshold: Double,
-				vararg steps: LongArray,
+				indexToId: (Long) -> Long = {it+1},
 				unionFind: UnionFind = IntArrayUnionFind(Intervals.numElements(labels).toInt()),
 				toIndex: (Localizable) -> Long = { IntervalIndexer.positionToIndex(it, labels) }
 		): Long {
@@ -68,22 +40,52 @@ class ConnectedComponents {
 						Views.translate(unionMask, *Intervals.minAsLongArray(labels).invertValues()),
 						threshold,
 						*steps,
+						indexToId = indexToId,
 						unionFind = unionFind,
 						toIndex = toIndex)
 
 			unionFindFromSymmetricAffinities(foreground, Views.interval(affinities, labels), unionMask, unionFind, threshold, *steps, toIndex = toIndex)
-			return relabel(Views.interval(foreground, labels), labels, Views.interval(unionMask, labels), unionFind, toIndex)
+			return relabel(Views.interval(foreground, labels), labels, Views.interval(unionMask, labels), unionFind, toIndex, indexToId)
 		}
 
 		@JvmStatic
 		@JvmOverloads
+		fun <B: BooleanType<B>, U: BooleanType<U>, R: RealType<R>, C: Composite<R>, L: IntegerType<L>> fromSymmetricAffinities(
+				foreground: RandomAccessible<B>,
+				affinities: RandomAccessible<C>,
+				labels: RandomAccessibleInterval<L>,
+				unionMask: RandomAccessible<U>,
+				threshold: Double,
+				vararg steps: LongArray,
+				indexToId: (Long) -> Long = {it+1},
+				toIndex: (Localizable) -> Long = { IntervalIndexer.positionToIndex(it, labels) },
+				unionFind: UnionFind = IntArrayUnionFind(Intervals.numElements(labels).toInt())
+		): Long {
+
+			if (!Views.isZeroMin(labels))
+				return fromSymmetricAffinities(
+						Views.translate(foreground, *Intervals.minAsLongArray(labels).invertValues()),
+						Views.translate(affinities, *Intervals.minAsLongArray(labels).invertValues()),
+						Views.zeroMin(labels),
+						Views.translate(unionMask, *Intervals.minAsLongArray(labels).invertValues()),
+						threshold,
+						*steps,
+						indexToId = indexToId,
+						unionFind = unionFind,
+						toIndex = toIndex)
+
+			unionFindFromSymmetricAffinities(foreground, Views.interval(affinities, labels), unionMask, unionFind, threshold, *steps, toIndex = toIndex)
+			return relabel(Views.interval(foreground, labels), labels, Views.interval(unionMask, labels), unionFind, toIndex, indexToId)
+		}
+
+		@JvmStatic
 		fun <B: BooleanType<B>, U: BooleanType<U>, L: IntegerType<L>> relabel(
 				mask: RandomAccessibleInterval<B>,
 				labels: RandomAccessibleInterval<L>,
 				unionMask: RandomAccessibleInterval<U>,
 				unionFind: UnionFind,
 				toIndex: (Localizable) -> Long,
-				indexToId: (Long) -> Long = {it+1})
+				indexToId: (Long) -> Long)
 		: Long {
 			val c = Views.flatIterable(labels).cursor()
 			val b = Views.flatIterable(mask).cursor()
@@ -104,7 +106,6 @@ class ConnectedComponents {
 		}
 
 		@JvmStatic
-		@JvmOverloads
 		fun <B: BooleanType<B>, U: BooleanType<U>, R: RealType<R>, C: Composite<R>> unionFindFromSymmetricAffinities(
 				foreground: RandomAccessible<B>,
 				affinities: RandomAccessibleInterval<C>,
@@ -171,7 +172,6 @@ class ConnectedComponents {
 		}
 
 		@JvmStatic
-		@JvmOverloads
 		fun <B: BooleanType<B>, U: BooleanType<U>, R: RealType<R>, C: Composite<R>> unionFindFromSymmetricAffinities(
 				foreground: RandomAccessible<B>,
 				affinities: RandomAccessibleInterval<C>,
