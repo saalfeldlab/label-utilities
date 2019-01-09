@@ -13,6 +13,7 @@ import net.imglib2.util.Intervals
 import net.imglib2.view.Views
 import net.imglib2.view.composite.Composite
 import java.util.Arrays
+import java.util.function.LongUnaryOperator
 
 class ConnectedComponents {
 
@@ -27,7 +28,7 @@ class ConnectedComponents {
 				unionMask: RandomAccessible<U>,
 				threshold: Double,
 				vararg steps: Long,
-				indexToId: (Long) -> Long = {it+1},
+				indexToId: LongUnaryOperator = LongUnaryOperator { it + 1 },
 				unionFind: UnionFind = IntArrayUnionFind(Intervals.numElements(labels).toInt()),
 				toIndex: (Localizable) -> Long = { IntervalIndexer.positionToIndex(it, labels) }
 		): Long {
@@ -57,7 +58,7 @@ class ConnectedComponents {
 				unionMask: RandomAccessible<U>,
 				threshold: Double,
 				vararg steps: LongArray,
-				indexToId: (Long) -> Long = {it+1},
+				indexToId: LongUnaryOperator = LongUnaryOperator { it + 1 },
 				toIndex: (Localizable) -> Long = { IntervalIndexer.positionToIndex(it, labels) },
 				unionFind: UnionFind = IntArrayUnionFind(Intervals.numElements(labels).toInt())
 		): Long {
@@ -85,7 +86,7 @@ class ConnectedComponents {
 				unionMask: RandomAccessibleInterval<U>,
 				unionFind: UnionFind,
 				toIndex: (Localizable) -> Long,
-				indexToId: (Long) -> Long)
+				indexToId: LongUnaryOperator)
 		: Long {
 			val c = Views.flatIterable(labels).cursor()
 			val b = Views.flatIterable(mask).cursor()
@@ -96,7 +97,7 @@ class ConnectedComponents {
 				b.fwd()
 				u.fwd()
 				if (b.get().get() && u.get().get()) {
-					val id = indexToId(unionFind.findRoot(toIndex(c)))
+					val id = indexToId.applyAsLong(unionFind.findRoot(toIndex(c)))
 					p.setInteger(id)
 					if (id > maxId)
 						maxId = id
