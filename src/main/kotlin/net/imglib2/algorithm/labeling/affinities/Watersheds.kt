@@ -44,6 +44,8 @@ class Watersheds {
 
 		private const val STORE_AFF_INDEX = 0L
 
+		@JvmStatic
+		@JvmOverloads
 		fun <A: RealType<A>> constructAffinities(
 				affinities: RandomAccessibleInterval<A>,
 				vararg offsets: LongArray,
@@ -87,10 +89,13 @@ class Watersheds {
 			TODO("View-based symmetric affinities not yet implemented. Use factory instead.")
 		}
 
+		@JvmStatic
 		fun symmetricOffsets(vararg offsets: LongArray): Array<LongArray> {
 			return arrayOf(*offsets) + Stream.of(*offsets).map { it.invertValues() }.collect(Collectors.toList()).toTypedArray()
 		}
 
+		@JvmStatic
+		@JvmOverloads
 		fun <A: RealType<A>, L: IntegerType<L>, C: Composite<A>> seededFromAffinities(
 				affinities: RandomAccessible<C>,
 				labels: RandomAccessibleInterval<L>,
@@ -219,6 +224,7 @@ class Watersheds {
 			return java.lang.Double.doubleToRawLongBits(d)
 		}
 
+		@JvmStatic
 		fun collectSeeds(seedMask: RandomAccessibleInterval<out BooleanType<*>>): List<Point> {
 			val s = Views.iterable(seedMask).cursor()
 			val seeds = mutableListOf<Point>()
@@ -228,6 +234,7 @@ class Watersheds {
 			return seeds
 		}
 
+		@JvmStatic
 		fun <B: BooleanType<B>, S: BooleanType<S>> seedsFromMask(mask: RandomAccessible<B>, seedMask: RandomAccessibleInterval<S>, vararg offsets: LongArray) {
 			for (offset in offsets) {
 				val seedMaskCursor = Views.flatIterable(seedMask).cursor()
