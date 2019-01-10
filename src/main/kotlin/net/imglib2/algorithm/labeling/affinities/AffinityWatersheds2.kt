@@ -1,6 +1,5 @@
 import gnu.trove.list.array.TIntArrayList
 import gnu.trove.list.array.TLongArrayList
-import net.imglib2.Cursor
 import net.imglib2.Dimensions
 import net.imglib2.RandomAccessibleInterval
 import net.imglib2.img.array.ArrayImgs
@@ -13,11 +12,12 @@ import net.imglib2.view.composite.RealComposite
 import java.util.ArrayList
 import java.util.Arrays
 import java.util.concurrent.Callable
-import java.util.concurrent.ExecutionException
 import java.util.function.BiPredicate
 import java.util.function.Predicate
 
 object AffinityWatersheds2 {
+
+	// TODO decide what to do about symmetry!
 
     fun generateStride(i: Dimensions): LongArray {
         val nDim = i.numDimensions()
@@ -58,15 +58,16 @@ object AffinityWatersheds2 {
         return inverseBitmask
     }
 
-    @Throws(InterruptedException::class, ExecutionException::class)
+	@JvmStatic
     fun <T : RealType<T>> letItRain(
-            source: RandomAccessibleInterval<RealComposite<T>>,
-            compare: BiPredicate<T, T>,
-            worst: T,
-            vararg offsets: LongArray): Pair<LongArray, LongArray> {
+			source: RandomAccessibleInterval<RealComposite<T>>,
+			isValid: Predicate<T>,
+			isBetter: BiPredicate<T, T>,
+			worst: T,
+			vararg offsets: LongArray): Pair<LongArray, LongArray> {
 
         if (!Views.isZeroMin(source))
-            return letItRain(Views.zeroMin(source), compare, worst)
+            return letItRain(Views.zeroMin(source), isValid, isBetter, worst)
 
         assert(Intervals.numElements(source) <= Integer.MAX_VALUE)
 
@@ -83,36 +84,23 @@ object AffinityWatersheds2 {
         val bitmask = generateDirectionBitmask(nDim)
         val inverseBitmask = generateInverseDirectionBitmask(bitmask)
 
-        val t0 = System.nanoTime()
-        findParents(source, labels, compare, worst, bitmask, offsets.size)
-        val t1 = System.nanoTime()
-        println("findParents: " + (t1 - t0) / 1e6 + "ms")
-
-        val t2 = System.nanoTime()
+        findParents(source, labels, isValid, isBetter, worst, bitmask, offsets.size)
         val plateauCorners = findPlateauCorners(labels, steps, bitmask, inverseBitmask, secondHighBit)
-        val t3 = System.nanoTime()
-        println("findPlateauCorners: " + (t3 - t2) / 1e6 + "ms")
-
-        val t4 = System.nanoTime()
         removePlateaus(plateauCorners, labels, steps, bitmask, inverseBitmask, highBit, secondHighBit)
-        val t5 = System.nanoTime()
-        println("removePlateaus: " + (t5 - t4) / 1e6 + "ms")
-
-        val t6 = System.nanoTime()
         val counts = fillFromRoots(labels, steps, bitmask, inverseBitmask, highBit)
-        val t7 = System.nanoTime()
 
         return Pair(labels, counts)
 
     }
 
     private fun <T : RealType<T>> findParents(
-            source: RandomAccessibleInterval<RealComposite<T>>,
-            labels: LongArray,
-            compare: BiPredicate<T, T>,
-            worst: T,
-            bitMask: LongArray,
-            nEdges: Int) {
+			source: RandomAccessibleInterval<RealComposite<T>>,
+			labels: LongArray,
+			isValid: Predicate<T>,
+			isBetter: BiPredicate<T, T>,
+			worst: T,
+			bitMask: LongArray,
+			nEdges: Int) {
         val size = labels.size
         val cursor = Views.flatIterable(source).cursor()
         val currentBest = worst.createVariable()
@@ -124,7 +112,7 @@ object AffinityWatersheds2 {
 
             for (edgeIndex in 0 until nEdges) {
                 val currentWeight = edgeWeights.get(edgeIndex.toLong())
-                if (compare.test(currentWeight, currentBest))
+                if (isValid.test(currentWeight) && isBetter.test(currentWeight, currentBest))
                     currentBest.set(currentWeight)
             }
 
@@ -220,7 +208,6 @@ object AffinityWatersheds2 {
 
         var backgroundCount = 0L
 
-        val rootLocatingTasks = ArrayList<Callable<TLongArrayList>>()
         val roots = TIntArrayList()
 
         for (index in 0 until size) {
@@ -251,12 +238,8 @@ object AffinityWatersheds2 {
             }
         }
 
-        rootLocatingTasks.clear()
-
         val counts = LongArray(roots.size() + 1)
         counts[0] = backgroundCount
-
-        val tasks = ArrayList<Callable<Void>>()
 
         for (id in 1 until counts.size) {
             val queue = TIntArrayList()
@@ -306,6 +289,7 @@ fun main(args: Array<String>) {
 
 	val (labels, counts) = AffinityWatersheds2.letItRain(
 			affinities,
+			Predicate { !it.realDouble.isNaN() },
 			BiPredicate { v1, v2 -> v1.realDouble > v2.realDouble },
 			DoubleType(Double.NEGATIVE_INFINITY),
 			*offsets)
