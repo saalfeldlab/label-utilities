@@ -1,291 +1,342 @@
-package net.imglib2.algorithm.labeling.affinities
-
 import gnu.trove.list.array.TIntArrayList
-import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue
-//import org.apache.commons.math3.analysis.differentiation.SparseGradient.createVariable
-import gnu.trove.list.array.TLongArrayList
-import it.unimi.dsi.fastutil.ints.IntComparators
-import net.imglib2.*
-import net.imglib2.algorithm.neighborhood.Neighborhood
-import net.imglib2.algorithm.neighborhood.Shape
-import net.imglib2.algorithm.util.unionfind.IntArrayUnionFind
-import net.imglib2.algorithm.util.unionfind.UnionFind
+import net.imglib2.Dimensions
+import net.imglib2.RandomAccessibleInterval
 import net.imglib2.img.array.ArrayImgs
 import net.imglib2.type.Type
-import net.imglib2.type.numeric.IntegerType
-import net.imglib2.type.numeric.integer.IntType
-import net.imglib2.type.numeric.integer.LongType
+import net.imglib2.type.numeric.RealType
 import net.imglib2.type.numeric.real.DoubleType
-import net.imglib2.util.IntervalIndexer
 import net.imglib2.util.Intervals
-import net.imglib2.util.Pair;
 import net.imglib2.view.Views
 import net.imglib2.view.composite.Composite
+import net.imglib2.view.composite.RealComposite
+import org.slf4j.LoggerFactory
+import java.lang.invoke.MethodHandles
 import java.util.*
 import java.util.function.BiPredicate
 import java.util.function.Predicate
-import java.util.stream.Stream
 
+internal object Rain {
 
-class Rain {
+	// TODO decide what to do about symmetry!
 
-	companion object {
-//		interface Checks<T : Type<T>, U : IntegerType<U>> {
-//
-//			fun isPlateau(position: Long, u: U, neighbors: Neighborhood<Pair<T, U>>): Boolean {
-//				return position == u.getIntegerLong()
-//			}
-//
-//			fun isSamePlateau(t1: T, u1: U, t2: T, u2: U): Boolean {
-//				return t1.valueEquals(t2)
-//			}
-//
-//			fun isBoundary(t: T, u: U, neighbors: Neighborhood<Pair<T, U>>): Boolean {
-//				val n = neighbors.cursor()
-//				while (n.hasNext())
-//					if (n.next().getA().valueEquals(t)) {
-//						u.set(n.get().getB())
-//						return true
-//					}
-//				return false
-//			}
-//
-//		}
+	private val LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
 
-		// TODO still need to resolve plateaus
-		@JvmStatic
-		fun <T : Type<T>, C : Composite<T>> watershed(
-				img: RandomAccessibleInterval<C>,
-				isValid: Predicate<T>,
-				compare: BiPredicate<T, T>,
-				worstVal: T,
-				vararg offsets: LongArray): kotlin.Pair<IntArray, TIntArrayList> {
+	fun generateStride(i: Dimensions): LongArray {
+		val nDim = i.numDimensions()
+		val strides = LongArray(nDim)
 
-			if (Intervals.numElements(img) > Integer.MAX_VALUE)
-				throw IllegalArgumentException("" +
-						"Only images smaller than max array size allowed. " +
-						"Got ${Intervals.numElements(img)} (${Arrays.toString(Intervals.dimensionsAsLongArray(img))})")
+		strides[0] = 1
+		for (d in 1 until nDim)
+			strides[d] = strides[d - 1] * i.dimension(d - 1)
 
-			if (!Views.isZeroMin(img))
-				return watershed(Views.zeroMin(img), isValid, compare, worstVal)
+		return strides
+	}
 
-			val steps = offsetsToSteps(dimensionStrides(img), *offsets)
+	fun generateSteps(strides: LongArray, offsets: Array<out LongArray>): LongArray {
+		val steps = LongArray(offsets.size)
+		for (d in steps.indices) {
+			var step: Long = 0
+			for (k in 0 until offsets[d].size)
+				step += strides[k] * offsets[d][k]
+			steps[d] = step
+		}
+		return steps
+	}
 
-			val parentStore = IntArray(Intervals.numElements(img).toInt())
+	fun generateDirectionBitmask(nStrides: Int): LongArray {
 
-			findParents(img, parentStore, isValid, compare, worstVal, *steps.map { it.toInt() }.toIntArray())
+		require(nStrides <= 30)
 
-			val roots = findRoots(parentStore)
+		val bitmask = LongArray(nStrides)
+		for (d in bitmask.indices)
+			bitmask[d] = (1 shl d).toLong()
+		return bitmask
+	}
 
-			for (index in parentStore.indices) {
-				val root = find(parentStore, index)
-				parentStore[index] = root
-			}
+	fun generateInverseDirectionBitmask(bitmask: LongArray): LongArray {
+		val inverseBitmask = LongArray(bitmask.size)
+		for (d in bitmask.indices)
+			inverseBitmask[d] = bitmask[bitmask.size - 1 - d]
+		return inverseBitmask
+	}
 
-			return kotlin.Pair(parentStore, roots)
+	@JvmStatic
+	fun <T : Type<T>> letItRain(
+			source: RandomAccessibleInterval<out Composite<T>>,
+			isValid: Predicate<T>,
+			isBetter: BiPredicate<T, T>,
+			worst: T,
+			vararg offsets: LongArray): Pair<LongArray, LongArray> {
+
+		checkOffsets(*offsets)
+
+		if (!Views.isZeroMin(source))
+			return letItRain(Views.zeroMin(source), isValid, isBetter, worst)
+
+		assert(Intervals.numElements(source) <= Integer.MAX_VALUE)
+
+		val size = Intervals.numElements(source).toInt()
+
+		val labels = LongArray(size)
+
+		val highBit = 1L shl 63
+		val secondHighBit = 1L shl 62
+
+		val nDim = source.numDimensions()
+		val strides = generateStride(source)
+		val steps = Arrays.stream(generateSteps(strides, offsets)).mapToInt { l -> l.toInt() }.toArray()
+		val bitmask = generateDirectionBitmask(offsets.size)
+		val inverseBitmask = generateInverseDirectionBitmask(bitmask)
+
+		LOG.debug("Steps:           {}", steps)
+		LOG.debug("Bitmask:         {}", bitmask)
+		LOG.debug("Inverse bitmask: {}", inverseBitmask)
+
+		findParents(source, labels, isValid, isBetter, worst, bitmask, offsets.size)
+		LOG.debug("Parent labels: {}", labels)
+		val plateauCorners = findPlateauCorners(labels, steps, bitmask, inverseBitmask, secondHighBit)
+		LOG.debug("Plateau corners: {}", plateauCorners)
+		removePlateaus(plateauCorners, labels, steps, bitmask, inverseBitmask, highBit, secondHighBit)
+		LOG.debug("Labels after plateau removal: {}", labels)
+		val counts = fillFromRoots(labels, steps, bitmask, inverseBitmask, highBit)
+
+		return Pair(labels, counts)
+
+	}
+
+	private fun checkOffsets(vararg offsets: LongArray) {
+
+		fun LongArray.invert(): LongArray {
+			return LongArray(this.size, { -this[it] } )
+		}
+		require(offsets.size % 2 == 0) {"Expecting symmetric affinities but got odd number of offsets: ${offsets.map { Arrays.toString(it) }}"}
+		require(offsets.size <= 30) {"Number of offsets cannot be greater than 30 but got: ${offsets.map { Arrays.toString(it) }}"}
+
+		val halfSize = offsets.size / 2
+		for (index in 0 until halfSize) {
+			val otherIndex = offsets.size - 1 - index
+			require(Arrays.equals(offsets[index], offsets[otherIndex].invert()))
+			{ "${index}th offset is not symmetric (require offsets[i] == -offsets[offsets.size - 1 -i]): ${Arrays.toString(offsets[index])} != - ${Arrays.toString(offsets[otherIndex])} (${offsets.map { Arrays.toString(it) } })" }
 		}
 
+	}
 
-		private fun <T: Type<T>, C: Composite<T>> findParents(
-				img: RandomAccessibleInterval<C>,
-				parentStore: IntArray,
-				isValid: Predicate<T>,
-				compare: BiPredicate<T, T>, // first better than second?
-				worstVal: T,
-				vararg offsets: Int) {
+	fun <T : Type<T>> findParents(
+			source: RandomAccessibleInterval<out Composite<T>>,
+			labels: LongArray,
+			isValid: Predicate<T>,
+			isBetter: BiPredicate<T, T>,
+			worst: T,
+			bitMask: LongArray,
+			nEdges: Int) {
+		val size = labels.size
+		val cursor = Views.flatIterable(source).cursor()
+		val currentBest = worst.createVariable()
 
-			val nDim = img.numDimensions()
-			val maxDim = nDim - 1
+		for (start in 0 until size) {
+			val edgeWeights = cursor.next()
+			var label: Long = 0
+			currentBest.set(worst)
 
-			// TODO only need size here, remove strides
-			val strides = LongArray(nDim)
-			strides[0] = 1
-			for (d in 1 until strides.size)
-				strides[d] = strides[d - 1] * img.dimension(d - 1)
-//			val size = strides[nDim - 1] * img.dimension(nDim - 1)
-			val size = Intervals.numElements(img).toInt()
+			for (edgeIndex in 0 until nEdges) {
+				val currentWeight = edgeWeights.get(edgeIndex.toLong())
+				if (isValid.test(currentWeight) && isBetter.test(currentWeight, currentBest))
+					currentBest.set(currentWeight)
+			}
 
-			val currentBest = img.randomAccess().get().get(0).createVariable()
-			var currentArgBest: Int
+			if (!currentBest.valueEquals(worst))
+				for (i in 0 until nEdges)
+					if (edgeWeights.get(i.toLong()).valueEquals(currentBest))
+						label = label or bitMask[i]
 
-			val cursor = Views.flatIterable(img).cursor()
+			labels[start] = label
+		}
 
-			for (pos in 0 until size) {
-				val current = cursor.next()
-				currentBest.set(worstVal)
-				currentArgBest = pos
+	}
 
-				offsets.forEachIndexed { i, offset ->
-					val affinity = current.get(i.toLong())
-					if (isValid.test(affinity)) {
-						if (compare.test(affinity, currentBest)) {
-							currentBest.set(affinity)
-							currentArgBest = pos + offset
-						}
+	private fun findPlateauCorners(
+			labels: LongArray,
+			steps: IntArray,
+			bitmask: LongArray,
+			inverseBitmask: LongArray,
+			plateauCornerMask: Long): TIntArrayList {
+		val nEdges = steps.size
+		val size = labels.size
+
+
+		val plateauCornerIndices = TIntArrayList()
+
+		for (index in 0 until size) {
+
+			val label = labels[index]
+			for (i in 0 until nEdges) {
+				if (label and bitmask[i] != 0L) {
+					val otherIndex = index + steps[i]
+					if (labels[otherIndex] and inverseBitmask[i] == 0L) {
+						labels[index] = label or plateauCornerMask
+						plateauCornerIndices.add(index)
+						break
 					}
-
-				}
-
-				parentStore[pos] = currentArgBest
-
-			}
-
-		}
-
-		private fun findRoots(
-				labels: IntArray): TIntArrayList {
-
-			val roots = TIntArrayList()
-
-			labels.forEachIndexed { index, current ->
-				val other = labels[current]
-				if (other == index) {
-					labels[index] = index
-					roots.add(index)
 				}
 			}
 
-			return roots
 		}
 
-//		private fun <T : Type<T>, U : IntegerType<U>> findNonMinimumPlateauBoundaries(
-//				img: RandomAccessible<T>,
-//				labels: RandomAccessibleInterval<U>,
-//				shape: Shape,
-//				compare: BiPredicate<T, T>,
-//				plateauBoundaryCheck: Checks<T, U>): LongArrayFIFOQueue {
-//			val queue = LongArrayFIFOQueue()
-//			val currentIndex = labels.randomAccess().get().createVariable()
-//
-//			val imgAndLabelsAccessible = Views.pair(img, Views.extendBorder(labels))
-//			val imgAndLabelsNeighborhood = shape.neighborhoodsRandomAccessible(imgAndLabelsAccessible)
-//			val neighborhoodAndLabels = Views.pair(imgAndLabelsNeighborhood, Views.pair(img, labels))
-//
-//
-//			val cursor = Views.interval(neighborhoodAndLabels, labels).cursor()
-//			while (cursor.hasNext()) {
-//				val pair = cursor.next()
-//				val currentPair = pair.getB()
-//				val ref = currentPair.getA()
-//				val refIndex = currentPair.getB()
-//				val index = IntervalIndexer.positionToIndex(cursor, labels)
-//				currentIndex.setInteger(index)
-//
-//				val neighbors = pair.getA()
-//
-//				if (plateauBoundaryCheck.isBoundary(ref, refIndex, neighbors)) {
-//					val isBoundaryPixel = plateauBoundaryCheck.isBoundary(ref, refIndex, neighbors)
-//
-//					if (isBoundaryPixel) {
-//						val neighborCursor = pair.getA().cursor()
-//						while (neighborCursor.hasNext()) {
-//							val p = neighborCursor.next()
-//							if (p.getA().valueEquals(ref))
-//								queue.enqueue(IntervalIndexer.positionToIndex(neighborCursor, labels))
-//						}
+		return plateauCornerIndices
+	}
+
+	private fun removePlateaus(
+			queue: TIntArrayList,
+			labels: LongArray,
+			steps: IntArray,
+			bitMask: LongArray,
+			inverseBitmask: LongArray,
+			highBit: Long,
+			secondHighBit: Long) {
+
+		// This is the same as example in paper, if traversal order of queue is
+		// reversed.
+
+		// helpers
+		val nEdges = steps.size
+
+		var queueIndex = 0
+		while(queueIndex < queue.size()) {
+			val index = queue.get(queueIndex)
+			var parent: Long = 0
+			val label = labels[index]
+			for (d in 0 until nEdges)
+				if (label and bitMask[d] != 0L) {
+					val otherIndex = index + steps[d]
+//					run {
+					val otherLabel = labels[otherIndex]
+					if (otherLabel and inverseBitmask[d] != 0L && otherLabel and secondHighBit == 0L) {
+						queue.add(otherIndex)
+						labels[otherIndex] = otherLabel or secondHighBit
+					} else if (parent == 0L)
+						parent = bitMask[d]
 //					}
-//				}
-//			}
-//
-//			return queue
-//		}
+				}
 
-//		private fun <T : Type<T>, U : IntegerType<U>> fillNonMinimumPlateaus(
-//				img: RandomAccessible<T>,
-//				labels: RandomAccessibleInterval<U>,
-//				shape: Shape,
-//				compare: BiPredicate<T, T>,
-//				checks: Checks<T, U>,
-//				queue: LongArrayFIFOQueue) {
-//
-//			val access = Views.pair(img, labels).randomAccess()
-//			val neighborhoodsAccess = shape.neighborhoodsRandomAccessible(Views.pair(img, labels)).randomAccess()
-//
-//			while (!queue.isEmpty) {
-//				val index = queue.dequeueLong()
-//				IntervalIndexer.indexToPosition(index, labels, access)
-//				IntervalIndexer.indexToPosition(index, labels, neighborhoodsAccess)
-//				val ref = access.get()
-//
-//				val neighbors = neighborhoodsAccess.get()
-//
-//				val nCursor = neighbors.cursor()
-//				while (nCursor.hasNext()) {
-//					val n = nCursor.next()
-//					if (checks.isSamePlateau(ref.getA(), ref.getB(), n.getA(), n.getB())) {
-//						n.getB().setInteger(index)
-//						queue.enqueue(IntervalIndexer.positionToIndex(nCursor, labels))
-//					}
-//				}
-//
-//			}
-//		}
-
-		// TODO replace this with union find
-		private fun find(parentStore: IntArray, index: Int): Int {
-			var returnVal = index
-
-			while (true) {
-				val currentVal = parentStore[returnVal]
-				if (currentVal == returnVal)
-					break
-				returnVal = currentVal
-			}
-
-			var w = index
-			while (w != returnVal) {
-				val t = parentStore[w]
-				val tmp = t
-				parentStore[w] = returnVal
-				w = tmp
-			}
-
-			return returnVal
-		}
-
-		private fun dimensionStrides(dims: Dimensions): LongArray {
-			val strides = LongArray(dims.numDimensions())
-			strides[0] = 1
-			for (d in 1 until strides.size)
-			strides[d] = strides[d - 1] * dims.dimension(d - 1)
-			return strides
-		}
-
-		private fun offsetsToSteps(strides: LongArray, vararg offsets: LongArray): LongArray {
-			return Stream.of(*offsets).mapToLong { offsetToStep(strides, *it) }.toArray()
-		}
-
-		private fun offsetToStep(strides: LongArray, vararg offsets: Long): Long {
-			return Stream.of(*offsets.indices.toList().toTypedArray()).mapToLong {strides[it] * offsets[it]}.sum()
+			labels[index] = parent
+			++queueIndex
 		}
 	}
 
+	private fun fillFromRoots(
+			labels: LongArray,
+			steps: IntArray,
+			bitmask: LongArray,
+			inverseBitmask: LongArray,
+			visitedMask: Long): LongArray {
+
+		val size = labels.size
+		val nEdges = steps.size
+
+
+		var backgroundCount = 0L
+
+		val roots = TIntArrayList()
+
+		for (index in 0 until size) {
+			run {
+				var isChild = false
+				var hasChild = false
+
+				val label = labels[index]
+
+				var i = 0
+				while (i < nEdges && !isChild && !hasChild) {
+					if (label and bitmask[i] != 0L) {
+						isChild = true
+						val otherIndex = index + steps[i]
+						if (labels[otherIndex] and inverseBitmask[i] != 0L && index < otherIndex)
+							hasChild = true
+
+					}
+					++i
+				}
+				if (hasChild)
+					roots.add(index)
+				else if (!isChild)
+					++backgroundCount
+				else Unit
+			}
+		}
+
+		LOG.debug("Found roots {}", roots)
+		LOG.debug("Parent labels after root relabeling {}", labels)
+
+		val counts = LongArray(roots.size() + 1)
+		counts[0] = backgroundCount
+
+		for (id in 1 until counts.size) {
+			val queue = TIntArrayList()
+			run {
+				queue.add(roots.get(id - 1))
+				val regionLabel = id.toLong() or visitedMask
+				var startIndex = 0
+				while (startIndex < queue.size()) {
+					val index = queue.get(startIndex)
+					for (d in 0 until nEdges) {
+						val otherIndex = index + steps[d]
+						if (otherIndex >= 0 && otherIndex < size) {
+							val otherLabel = labels[otherIndex]
+							if (otherLabel and visitedMask == 0L && otherLabel and inverseBitmask[d] != 0L)
+								queue.add(otherIndex)
+						}
+					}
+					labels[index] = regionLabel
+					++counts[id]
+					++startIndex
+				}
+				queue.clear()
+			}
+		}
+
+		// should this happen outside?
+		val activeBits = visitedMask.inv()
+		for (start in 0 until size)
+			labels[start] = labels[start] and activeBits
+		return counts
+	}
 
 }
 
 fun main(args: Array<String>) {
 
 	val affinitiesStore = doubleArrayOf(
-			Double.NaN, Double.NaN, 0.8, 0.9,
-			Double.NaN, Double.NaN, 0.7, 0.6,
-			Double.NaN, 0.9, 0.85, 0.9,
+			Double.NaN, 0.1, 0.8, 0.9,
+			Double.NaN, 0.1, 0.7, 0.6,
+			Double.NaN, 0.9, 0.85, 0.85,
 
 			Double.NaN, Double.NaN, Double.NaN, Double.NaN,
 			1.0, 0.8, 1.0, 0.9,
-			0.95, 0.15, 0.01, 0.02
+			0.95, 0.15, 0.01, 0.02,
+
+
+			1.0, 0.8, 1.0, 0.9,
+			0.95, 0.15, 0.01, 0.02,
+			Double.NaN, Double.NaN, Double.NaN, Double.NaN,
+
+			0.1, 0.8, 0.9,  Double.NaN,
+			0.1, 0.7, 0.6,  Double.NaN,
+			0.9, 0.85, 0.85, Double.NaN
 	)
 
-	val affinities = Views.collapseReal(ArrayImgs.doubles(affinitiesStore, 4, 3, 2))
-	val offsets = arrayOf(longArrayOf(-1, 0), longArrayOf(0, -1))
+	val affinities = Views.collapse(ArrayImgs.doubles(affinitiesStore, 4, 3, 4))
+	val offsets = arrayOf(longArrayOf(-1, 0), longArrayOf(0, -1), longArrayOf(0, 1), longArrayOf(1, 0))
 
-	val (parents, roots) = Rain.watershed(
+	val (labels, counts) = Rain.letItRain(
 			affinities,
 			Predicate { !it.realDouble.isNaN() },
 			BiPredicate { v1, v2 -> v1.realDouble > v2.realDouble },
 			DoubleType(Double.NEGATIVE_INFINITY),
 			*offsets)
 
-	println("${Arrays.toString(parents)} $roots")
+//	for (index in labels.indices)
+//		labels[index] = labels[index] and (1 shl 31).inv()
+	println("${Arrays.toString(labels)} ${Arrays.toString(counts)}")
 
 
 }

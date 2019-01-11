@@ -8,7 +8,7 @@ import org.junit.Test
 import java.util.function.BiPredicate
 import java.util.function.Predicate
 
-class AffinityWatersheds2Test {
+class RainTest {
 
 	@Test
 	fun testFindParents() {
@@ -35,7 +35,7 @@ class AffinityWatersheds2Test {
 		val offsets = arrayOf(longArrayOf(-1, 0), longArrayOf(0, -1), longArrayOf(0, 1), longArrayOf(1, 0))
 
 		val labels = LongArray(12)
-		AffinityWatersheds2.findParents(
+		Rain.findParents(
 				affinities,
 				labels,
 				Predicate { !it.realDouble.isNaN() },

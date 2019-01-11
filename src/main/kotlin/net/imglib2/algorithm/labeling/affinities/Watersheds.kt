@@ -30,6 +30,7 @@ import java.lang.invoke.MethodHandles
 import java.util.Arrays
 import java.util.function.BiConsumer
 import java.util.function.BiPredicate
+import java.util.function.Predicate
 import java.util.stream.Collectors
 import java.util.stream.LongStream
 import java.util.stream.Stream
@@ -112,6 +113,28 @@ class Watersheds {
 					priorityQueue = priorityQueueFactory.create(),
 					labelsAndCostStore = createStore(labelsAndCostStoreFactory, labels),
 					notSetLabel = notSetLabel)
+		}
+
+		@JvmStatic
+		fun <T: RealType<T>> letItRainRealType(
+				affinities: RandomAccessibleInterval<out Composite<T>>,
+				isValid: Predicate<T> = Predicate { !it.realDouble.isNaN() },
+				isBetter: BiPredicate<T, T> = BiPredicate { t, u -> t.realDouble > u.realDouble },
+				worst: T,
+				vararg offsets: LongArray
+		): Pair<LongArray, LongArray> {
+			return letItRain(affinities, isValid, isBetter, worst, *offsets)
+		}
+
+		@JvmStatic
+		fun <T: Type<T>> letItRain(
+				affinities: RandomAccessibleInterval<out Composite<T>>,
+				isValid: Predicate<T>,
+				isBetter: BiPredicate<T, T>,
+				worst: T,
+				vararg offsets: LongArray
+		): Pair<LongArray, LongArray> {
+			return Rain.letItRain(affinities, isValid, isBetter, worst, *offsets)
 		}
 
 		private fun <A: RealType<A>, L: IntegerType<L>, C: Composite<A>> seededFromAffinities(
@@ -261,56 +284,6 @@ class Watersheds {
 			t.setInteger(Label.INVALID)
 			return t
 		}
-
-		// TODO do affinity based watersheds like in z-watersheds but only for non-labeled voxels
-		// https://github.com/hanslovsky/imglib2-algorithm/blob/a71ecc62070d52df83283e3dbf1fce80e946155a/src/main/java/net/imglib2/algorithm/morphology/watershed/AffinityWatershed.java
-//		fun <T: Type<T>, U: IntegerType<U>, C: Composite<T>> flood(
-//				img: RandomAccessible< C >,
-//				mask: RandomAccessible<out BooleanType<*>>,
-//				labels: RandomAccessibleInterval< U >,
-//				unionFind: IntArrayUnionFind,
-//				compare: BiPredicate<T, T>,
-//				worstVal: T,
-//				ignoreval: U
-//		) {
-//			val nDim = img.numDimensions();
-//
-//		findParents(img, labels, compare, worstVal, ignoreval);
-//
-//		roots TLongArrayList = findRoots(labels, ignoreval);
-
-//		long size = 1;
-//		for ( int d = 0; d < nDim; ++d )
-//			size *= labels.dimension( d );
-
-//		final RandomAccess< U > labelsAccess = FlatViews.flatten( labels ).randomAccess();
-//		final AbstractFlatView< U > flattenedMarkers = FlatViews.flatten( labels );
-//		for ( int i = 0; i < size; ++i )
-//		{
-//			final U label = get( labelsAccess, i );
-//			if ( label.valueEquals( ignoreval ) )
-//				continue;
-//			final long root = find( flattenedMarkers, i );
-//			label.setInteger( root );
-//		}
-//
-//		final long maxIndex = size - 1;
-//
-//		final long[] strides = new long[ img.numDimensions() ];
-//		strides[ 0 ] = 1;
-//		for ( int d = 1; d < strides.length; ++d )
-//			strides[ d ] = strides[ d - 1 ] * labels.dimension( d - 1 );
-//
-//		final long[] steps = new long[ strides.length * 2 ];
-//		{
-//			int idx = 0;
-//			for ( final int i : new int[] { -1, 1 } )
-//				for ( int d = 0; d < strides.length; ++d, ++idx )
-//					steps[idx] = strides[d] * i;
-//		}
-
-//		return roots;
-//		}
 
 	}
 
