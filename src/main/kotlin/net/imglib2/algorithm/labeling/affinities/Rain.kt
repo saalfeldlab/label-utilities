@@ -239,30 +239,29 @@ internal object Rain {
 		val roots = TIntArrayList()
 
 		for (index in 0 until size) {
-			run {
-				var isChild = false
-				var hasChild = false
+			var isChild = false
+			var hasChild = false
 
-				val label = labels[index]
+			val label = labels[index]
 
-				var i = 0
-				while (i < nEdges && !isChild && !hasChild) {
-					if (label and bitmask[i] != 0L) {
-						isChild = true
-						val otherIndex = index + steps[i]
-						if (labels[otherIndex] and inverseBitmask[i] != 0L && index < otherIndex)
-							hasChild = true
+			var i = 0
+			while (i < nEdges && !isChild && !hasChild) {
+				if (label and bitmask[i] != 0L) {
+					isChild = true
+					val otherIndex = index + steps[i]
+					if (labels[otherIndex] and inverseBitmask[i] != 0L && index < otherIndex)
+						hasChild = true
 
-					}
-					++i
 				}
-				if (hasChild)
-					roots.add(index)
-				else if (!isChild)
-					++backgroundCount
-				else Unit
+				++i
 			}
+			if (hasChild)
+				roots.add(index)
+			else if (!isChild)
+				++backgroundCount
+			else Unit
 		}
+
 
 		LOG.debug("Found roots {}", roots)
 		LOG.debug("Parent labels after root relabeling {}", labels)
@@ -270,27 +269,25 @@ internal object Rain {
 		val counts = LongArray(roots.size() + 1)
 		counts[0] = backgroundCount
 
+		val queue = TIntArrayList()
 		for (id in 1 until counts.size) {
-			val queue = TIntArrayList()
-			run {
-				queue.add(roots.get(id - 1))
-				val regionLabel = id.toLong() or visitedMask
-				var startIndex = 0
-				while (startIndex < queue.size()) {
-					val index = queue.get(startIndex)
-					for (d in 0 until nEdges) {
-						val otherIndex = index + steps[d]
-						if (otherIndex >= 0 && otherIndex < size) {
-							val otherLabel = labels[otherIndex]
-							if (otherLabel and visitedMask == 0L && otherLabel and inverseBitmask[d] != 0L)
-								queue.add(otherIndex)
-						}
+			queue.clear()
+			queue.add(roots.get(id - 1))
+			val regionLabel = id.toLong() or visitedMask
+			var startIndex = 0
+			while (startIndex < queue.size()) {
+				val index = queue.get(startIndex)
+				for (d in 0 until nEdges) {
+					val otherIndex = index + steps[d]
+					if (otherIndex >= 0 && otherIndex < size) {
+						val otherLabel = labels[otherIndex]
+						if (otherLabel and visitedMask == 0L && otherLabel and inverseBitmask[d] != 0L)
+							queue.add(otherIndex)
 					}
-					labels[index] = regionLabel
-					++counts[id]
-					++startIndex
 				}
-				queue.clear()
+				labels[index] = regionLabel
+				++counts[id]
+				++startIndex
 			}
 		}
 
@@ -300,6 +297,7 @@ internal object Rain {
 			labels[start] = labels[start] and activeBits
 		return counts
 	}
+
 
 }
 
