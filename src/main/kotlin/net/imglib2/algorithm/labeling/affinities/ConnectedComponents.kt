@@ -14,6 +14,7 @@ import net.imglib2.view.Views
 import net.imglib2.view.composite.Composite
 import java.util.Arrays
 import java.util.function.LongUnaryOperator
+import java.util.function.ToLongFunction
 
 class ConnectedComponents {
 
@@ -30,7 +31,7 @@ class ConnectedComponents {
 				vararg steps: Long,
 				indexToId: LongUnaryOperator = LongUnaryOperator { it + 1 },
 				unionFind: UnionFind = IntArrayUnionFind(Intervals.numElements(labels).toInt()),
-				toIndex: (Localizable) -> Long = { IntervalIndexer.positionToIndex(it, labels) }
+				toIndex: ToLongFunction<Localizable> = ToLongFunction{ IntervalIndexer.positionToIndex(it, labels) }
 		): Long {
 
 			if (!Views.isZeroMin(labels))
@@ -59,7 +60,7 @@ class ConnectedComponents {
 				threshold: Double,
 				vararg steps: LongArray,
 				indexToId: LongUnaryOperator = LongUnaryOperator { it + 1 },
-				toIndex: (Localizable) -> Long = { IntervalIndexer.positionToIndex(it, labels) },
+				toIndex: ToLongFunction<Localizable> = ToLongFunction{ IntervalIndexer.positionToIndex(it, labels) },
 				unionFind: UnionFind = IntArrayUnionFind(Intervals.numElements(labels).toInt())
 		): Long {
 
@@ -85,7 +86,7 @@ class ConnectedComponents {
 				labels: RandomAccessibleInterval<L>,
 				unionMask: RandomAccessibleInterval<U>,
 				unionFind: UnionFind,
-				toIndex: (Localizable) -> Long,
+				toIndex: ToLongFunction<Localizable>,
 				indexToId: LongUnaryOperator)
 		: Long {
 			val c = Views.flatIterable(labels).cursor()
@@ -97,7 +98,7 @@ class ConnectedComponents {
 				b.fwd()
 				u.fwd()
 				if (b.get().get() && u.get().get()) {
-					val id = indexToId.applyAsLong(unionFind.findRoot(toIndex(c)))
+					val id = indexToId.applyAsLong(unionFind.findRoot(toIndex.applyAsLong(c)))
 					p.setInteger(id)
 					if (id > maxId)
 						maxId = id
@@ -114,7 +115,7 @@ class ConnectedComponents {
 				unionFind: UnionFind,
 				threshold: Double,
 				vararg steps: Long,
-				toIndex: (Localizable) -> Long
+				toIndex: ToLongFunction<Localizable>
 		) {
 
 			if (steps.size != affinities.numDimensions())
@@ -157,8 +158,8 @@ class ConnectedComponents {
 					if (a.isNaN() || a < threshold)
 						continue
 
-					val r1 = unionFind.findRoot(toIndex(cCursor))
-					val r2 = unionFind.findRoot(toIndex(sCursor))
+					val r1 = unionFind.findRoot(toIndex.applyAsLong(cCursor))
+					val r2 = unionFind.findRoot(toIndex.applyAsLong(sCursor))
 
 					if (r1 != r2) {
 						unionFind.join(r1, r2)
@@ -180,7 +181,7 @@ class ConnectedComponents {
 				unionFind: UnionFind,
 				threshold: Double,
 				vararg steps: LongArray,
-				toIndex: (Localizable) -> Long
+				toIndex: ToLongFunction<Localizable>
 		) {
 
 			for (step in steps)
@@ -224,8 +225,8 @@ class ConnectedComponents {
 					if (a.isNaN() || a < threshold)
 						continue
 
-					val r1 = unionFind.findRoot(toIndex(cCursor))
-					val r2 = unionFind.findRoot(toIndex(sCursor))
+					val r1 = unionFind.findRoot(toIndex.applyAsLong(cCursor))
+					val r2 = unionFind.findRoot(toIndex.applyAsLong(sCursor))
 
 					if (r1 != r2) {
 						unionFind.join(r1, r2)
