@@ -49,15 +49,17 @@ class Watersheds {
 		@JvmOverloads
 		fun <A: RealType<A>> constructAffinities(
 				affinities: RandomAccessibleInterval<A>,
-				vararg offsets: LongArray,
+				offsets: Array<LongArray>,
+				order: IntArray = IntArray(offsets.size, {it}),
 				factory: ImgFactory<A>? = null): RandomAccessibleInterval<A> {
-			return if (factory == null) constructAffinitiesWithViews(affinities, *offsets) else constructAffinitiesWithCopy(affinities, factory, *offsets)
+			return if (factory == null) constructAffinitiesWithViews(affinities, *offsets) else constructAffinitiesWithCopy(affinities, factory, offsets, order)
 		}
 
 		private fun <A: RealType<A>> constructAffinitiesWithCopy(
 				affinities: RandomAccessibleInterval<A>,
 				factory: ImgFactory<A>,
-				vararg offsets: LongArray): RandomAccessibleInterval<A> {
+				offsets: Array<LongArray>,
+				order: IntArray = IntArray(offsets.size, {it})): RandomAccessibleInterval<A> {
 			val dims = Intervals.dimensionsAsLongArray(affinities)
 			dims[dims.size - 1] = dims[dims.size - 1] * 2
 			val symmetricAffinities = factory.create(*dims)
@@ -72,7 +74,8 @@ class Watersheds {
 			val zeroMinAffinities = if (Views.isZeroMin(affinities)) affinities else Views.zeroMin(affinities)
 
 			for (offsetIndex in 0 until offsets.size) {
-				val targetSlice = Views.hyperSlice(symmetricAffinities, dims.size - 1, offsets.size + offsetIndex.toLong())
+				val targetIndex = offsets.size + order[offsetIndex]
+				val targetSlice = Views.hyperSlice(symmetricAffinities, dims.size - 1, targetIndex.toLong())
 				val sourceSlice = Views.interval(Views.translate(
 						Views.extendValue(Views.hyperSlice(zeroMinAffinities, dims.size - 1, offsetIndex.toLong()), nanExtension),
 						*offsets[offsetIndex]), targetSlice)
