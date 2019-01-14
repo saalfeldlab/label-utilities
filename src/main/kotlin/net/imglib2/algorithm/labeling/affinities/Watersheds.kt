@@ -50,8 +50,8 @@ class Watersheds {
 		fun <A: RealType<A>> constructAffinities(
 				affinities: RandomAccessibleInterval<A>,
 				offsets: Array<LongArray>,
-				order: IntArray = IntArray(offsets.size, {it}),
-				factory: ImgFactory<A>? = null): RandomAccessibleInterval<A> {
+				factory: ImgFactory<A>? = null,
+				order: IntArray = IntArray(offsets.size, {it})): RandomAccessibleInterval<A> {
 			return if (factory == null) constructAffinitiesWithViews(affinities, *offsets) else constructAffinitiesWithCopy(affinities, factory, offsets, order)
 		}
 
