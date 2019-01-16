@@ -15,12 +15,15 @@ import net.imglib2.img.ImgFactory
 import net.imglib2.loops.LoopBuilder
 import net.imglib2.type.BooleanType
 import net.imglib2.type.Type
+import net.imglib2.type.logic.BitType
 import net.imglib2.type.numeric.IntegerType
 import net.imglib2.type.numeric.RealType
 import net.imglib2.type.numeric.integer.LongType
+import net.imglib2.util.ConstantUtils
 import net.imglib2.util.IntervalIndexer
 import net.imglib2.util.Intervals
 import net.imglib2.util.Util
+import net.imglib2.view.ExtendedRandomAccessibleInterval
 import net.imglib2.view.Views
 import net.imglib2.view.composite.Composite
 import net.imglib2.view.composite.RealComposite
@@ -261,7 +264,12 @@ class Watersheds {
 		}
 
 		@JvmStatic
-		fun <B: BooleanType<B>, S: BooleanType<S>> seedsFromMask(mask: RandomAccessible<B>, seedMask: RandomAccessibleInterval<S>, vararg offsets: LongArray) {
+		@JvmOverloads
+		fun <L: IntegerType<L>, S: BooleanType<S>> seedsFromMask(
+				mask: RandomAccessible<L>,
+				seedMask: RandomAccessibleInterval<S>,
+				vararg offsets: LongArray,
+				backgroundLabel: L = createAs(mask.randomAccess().get().createVariable(), Label.BACKGROUND)) {
 			for (offset in offsets) {
 				val seedMaskCursor = Views.flatIterable(seedMask).cursor()
 				val maskCursor = Views.flatIterable(Views.interval(mask, seedMask)).cursor()
@@ -269,13 +277,20 @@ class Watersheds {
 
 				while (seedMaskCursor.hasNext()) {
 					seedMaskCursor.fwd()
-					maskCursor.fwd()
-					maskAtOffsetCursor.fwd()
-					if (maskCursor.get().get() && !maskAtOffsetCursor.get().get())
+					val maskVal = maskCursor.next()
+					val maskValAtOffset = maskAtOffsetCursor.next()
+					if (maskValAtOffset.valueEquals(backgroundLabel) && !maskVal.valueEquals(backgroundLabel)) {
 						seedMaskCursor.get().set(true)
+					}
 				}
 
 			}
+		}
+
+		private fun <T: IntegerType<T>> createAs(t: T, value: Long): T {
+			val u = t.createVariable()
+			u.setInteger(value)
+			return u
 		}
 
 		private fun LongArray.invertValues(max: Long = 0): LongArray {
