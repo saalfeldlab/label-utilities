@@ -41,6 +41,27 @@ import java.util.stream.Stream
 
 class Watersheds {
 
+	enum class SymmetricOffsetOrder {
+		ABCABC {
+			override fun symmetricFrom(vararg offsets: LongArray): Array<LongArray> {
+				return arrayOf(*offsets) + invert(*offsets).toTypedArray()
+			}
+
+		},
+
+		ABCCBA {
+			override fun symmetricFrom(vararg offsets: LongArray): Array<LongArray> {
+				return arrayOf(*offsets) + invert(*offsets).asReversed().toTypedArray()
+			}
+		};
+
+		abstract fun symmetricFrom(vararg offsets: LongArray): Array<LongArray>
+
+		protected fun invert(vararg offsets: LongArray): List<LongArray> {
+			return offsets.map { it.invertValues() }
+		}
+	}
+
 	companion object {
 
 		private val LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
@@ -98,8 +119,9 @@ class Watersheds {
 		}
 
 		@JvmStatic
-		fun symmetricOffsets(vararg offsets: LongArray): Array<LongArray> {
-			return arrayOf(*offsets) + Stream.of(*offsets).map { it.invertValues() }.collect(Collectors.toList()).toTypedArray()
+		@JvmOverloads
+		fun symmetricOffsets(order: SymmetricOffsetOrder = SymmetricOffsetOrder.ABCABC, vararg offsets: LongArray): Array<LongArray> {
+			return order.symmetricFrom(*offsets)
 		}
 
 		@JvmStatic
