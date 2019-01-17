@@ -33,6 +33,7 @@ import java.lang.invoke.MethodHandles
 import java.util.Arrays
 import java.util.function.BiConsumer
 import java.util.function.BiPredicate
+import java.util.function.DoublePredicate
 import java.util.function.Predicate
 import java.util.stream.Collectors
 import java.util.stream.LongStream
@@ -108,14 +109,16 @@ class Watersheds {
 				labels: RandomAccessibleInterval<L>,
 				seeds: List<Point>,
 				vararg offsets: LongArray,
+				notSetLabel: L = withInvalid { Util.getTypeFromInterval(labels).createVariable() },
+				affinityIsValid: DoublePredicate = DoublePredicate { !it.isNaN() },
 				priorityQueueFactory: PriorityQueueFactory = PriorityQueueFastUtil.FACTORY,
-				labelsAndCostStoreFactory: (Dimensions) -> Img<LongType> = {Util.getSuitableImgFactory(it, LongType()).create(it)},
-				notSetLabel: L = withInvalid { Util.getTypeFromInterval(labels).createVariable() }) {
+				labelsAndCostStoreFactory: (Dimensions) -> Img<LongType> = {Util.getSuitableImgFactory(it, LongType()).create(it)}) {
 			seededFromAffinities(
 					affinities,
 					Views.extendValue(labels, notSetLabel.copy()),
 					seeds,
 					listOf(*offsets),
+					affinityIsValid = affinityIsValid,
 					priorityQueue = priorityQueueFactory.create(),
 					labelsAndCostStore = createStore(labelsAndCostStoreFactory, labels),
 					notSetLabel = notSetLabel)
@@ -150,7 +153,8 @@ class Watersheds {
 				offsets: List<LongArray>,
 				priorityQueue: PriorityQueue,
 				labelsAndCostStore: RandomAccessibleInterval<RealComposite<LongType>>,
-				notSetLabel: L) {
+				notSetLabel: L,
+				affinityIsValid: DoublePredicate) {
 
 			val affinitiesAccess = affinities.randomAccess()
 			val labelsAccess = labels.randomAccess()
@@ -178,7 +182,7 @@ class Watersheds {
 				zippedOffsets.forEachIndexed { index, (fwd, bck)->
 					val aff = affinity.get(index.toLong()).realDouble
 
-					if (!aff.isNaN()) {
+					if (affinityIsValid.test(aff)) {
 						labelsAndCostStoreAccess.move(fwd)
 						val lac = labelsAndCostStoreAccess.get()
 						val a = lac[STORE_AFF_INDEX]
