@@ -9,7 +9,7 @@
 
 	<groupId>org.janelia.saalfeldlab</groupId>
 	<artifactId>label-utilities</artifactId>
-	<version>0.4.2-SNAPSHOT</version>
+	<version>0.4.2</version>
 
 	<name>Label Utilities</name>
 	<description>Tools for label data.</description>
@@ -60,7 +60,7 @@
 	<scm>
 		<connection>scm:git:git://github.com/saalfeldlab/label-utilities</connection>
 		<developerConnection>scm:git:git@github.com:saalfeldlab/label-utilities</developerConnection>
-		<tag>HEAD</tag>
+		<tag>label-utilities-0.4.2</tag>
 		<url>https://github.com/saalfeldlab/label-utilities</url>
 	</scm>
 	<issueManagement>
