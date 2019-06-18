@@ -28,7 +28,7 @@ interface LabelBlockLookup {
 	 *
 	 */
 	@Retention(AnnotationRetention.RUNTIME)
-	@Target(AnnotationTarget.PROPERTY)
+	@Target(AnnotationTarget.FIELD)
 	@Inherited
 	annotation class Parameter
 
