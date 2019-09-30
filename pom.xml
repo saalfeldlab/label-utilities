@@ -72,8 +72,8 @@
 		<url>https://travis-ci.org/saalfeldlab/label-utilities</url>
 	</ciManagement>
 
-
 	<properties>
+		<package-name>org.janelia.saalfeldlab</package-name>
 		<license.licenseName>bsd_2</license.licenseName>
 		<license.copyrightOwners>Stephan Saalfeld</license.copyrightOwners>
 		<imglib2-algorithm.version>0.10.0</imglib2-algorithm.version>
