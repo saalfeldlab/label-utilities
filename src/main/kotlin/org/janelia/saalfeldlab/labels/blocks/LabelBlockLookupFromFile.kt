@@ -2,6 +2,7 @@ package org.janelia.saalfeldlab.labels.blocks
 
 import net.imglib2.FinalInterval
 import net.imglib2.Interval
+import net.imglib2.cache.ref.SoftRefLoaderCache
 import net.imglib2.util.Intervals
 import org.janelia.saalfeldlab.util.HashWrapper
 import org.slf4j.LoggerFactory
@@ -12,11 +13,14 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.*
 import java.util.function.BiFunction
+import java.util.function.Predicate
 
 @LabelBlockLookup.LookupType("from-file")
-class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: String) : LabelBlockLookup {
+class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: String) : CachedLabelBlockLookup {
 
 	private constructor(): this("")
+
+	private val cache = SoftRefLoaderCache<LabelBlockLookupKey, Array<Interval>>()
 
 	companion object {
 		private val LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
@@ -45,14 +49,34 @@ class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: 
 		{
 			return if (pattern == null) null else Paths.get(String.format(pattern, level, id))
 		}
-
 	}
 
-	override fun read(level: Int, id: Long): Array<Interval> {
+	override fun read(key: LabelBlockLookupKey): Array<Interval> {
+		return cache.get(key, this::readFromFile)
+	}
 
-		LOG.debug("Getting block list for id {} at level {}", id, level)
-		val path: Path? = getPath(level, id, pattern)
-		LOG.debug("File path for block list for id {} at level {} is {}", id, level, path)
+	override fun write(key: LabelBlockLookupKey, vararg intervals: Interval) {
+		invalidate(key)
+		writeToFile(key, *intervals)
+	}
+
+	override fun invalidate(key: LabelBlockLookupKey?) {
+		cache.invalidate(key)
+	}
+
+	override fun invalidateAll(parallelismThreshold: Long) {
+		cache.invalidateAll(parallelismThreshold)
+	}
+
+	override fun invalidateIf(parallelismThreshold: Long, condition: Predicate<LabelBlockLookupKey>?) {
+		cache.invalidateIf(parallelismThreshold, condition)
+	}
+
+	private fun readFromFile(key: LabelBlockLookupKey): Array<Interval> {
+
+		LOG.debug("Getting block list for id {} at level {}", key.id, key.level)
+		val path: Path? = getPath(key.level, key.id, pattern)
+		LOG.debug("File path for block list for id {} at level {} is {}", key.id, key.level, path)
 
 		if (path == null) {
 			LOG.debug("Invalid path, returning empty array: {}", path)
@@ -83,17 +107,16 @@ class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: 
 		} catch (e: Exception) {
 			LOG.debug(
 					"Unable to read data from file at {} for level and id {} -- returning empty array: " + "{}",
-					path, level, id,
+					path, key.level, key.id,
 					e.message, e
 			)
 			return EMPTY_ARRAY
 		}
-
 	}
 
-	override fun write(level: Int, id: Long, vararg intervals: Interval) {
+	private fun writeToFile(key: LabelBlockLookupKey, vararg intervals: Interval) {
 
-		val path: Path? = getPath(level, id, pattern)
+		val path: Path? = getPath(key.level, key.id, pattern)
 
 		if (path == null) {
 			LOG.info("Path is null, cannot write!")

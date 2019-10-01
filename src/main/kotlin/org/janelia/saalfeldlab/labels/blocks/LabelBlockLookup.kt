@@ -8,10 +8,10 @@ import java.lang.annotation.Inherited
 interface LabelBlockLookup {
 
 	@Throws(IOException::class)
-	fun read(level: Int, id: Long): Array<Interval>
+	fun read(key: LabelBlockLookupKey): Array<Interval>
 
 	@Throws(IOException::class)
-	fun write(level: Int, id: Long, vararg intervals: Interval)
+	fun write(key: LabelBlockLookupKey, vararg intervals: Interval)
 
 	/**
 	 * Annotation for runtime discovery of compression schemes.

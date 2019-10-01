@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>org.scijava</groupId>
 		<artifactId>pom-scijava</artifactId>
-		<version>26.0.0</version>
+		<version>27.0.1</version>
 	</parent>
 
 	<groupId>org.janelia.saalfeldlab</groupId>
@@ -72,8 +72,8 @@
 		<url>https://travis-ci.org/saalfeldlab/label-utilities</url>
 	</ciManagement>
 
-
 	<properties>
+		<package-name>org.janelia.saalfeldlab</package-name>
 		<license.licenseName>bsd_2</license.licenseName>
 		<license.copyrightOwners>Stephan Saalfeld</license.copyrightOwners>
 		<imglib2-algorithm.version>0.10.0</imglib2-algorithm.version>
@@ -81,6 +81,8 @@
 
 		<!-- NB: Deploy releases to the ImageJ Maven repository. -->
 		<releaseProfiles>deploy-to-scijava</releaseProfiles>
+
+		<imglib2-cache.version>1.0.0-beta-13</imglib2-cache.version>
 	</properties>
 
 	<repositories>
@@ -110,6 +112,10 @@
 		<dependency>
 			<groupId>net.imglib2</groupId>
 			<artifactId>imglib2-algorithm</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>net.imglib2</groupId>
+			<artifactId>imglib2-cache</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>net.sf.trove4j</groupId>
