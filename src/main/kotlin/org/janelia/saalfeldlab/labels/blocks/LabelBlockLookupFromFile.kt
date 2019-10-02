@@ -15,15 +15,25 @@ import java.util.*
 import java.util.function.BiFunction
 import java.util.function.Predicate
 
-@LabelBlockLookup.LookupType("from-file")
-class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: String) : CachedLabelBlockLookup {
+const val LABEL_BLOCK_LOOKUP_TYPE_STRING = "from-file"
+
+@LabelBlockLookup.LookupType(LABEL_BLOCK_LOOKUP_TYPE_STRING)
+class LabelBlockLookupFromFile(
+		@LabelBlockLookup.Parameter private val pattern: String,
+		@LabelBlockLookup.Parameter(ignoreInSerializationIfRelative = true) private var root: String? = null,
+		@LabelBlockLookup.Parameter override val isRelative: Boolean = true) : CachedLabelBlockLookup {
 
 	private constructor(): this("")
+
+	private val completePattern: String?
+		get() = root?.let { "$root/$pattern" } ?: pattern
 
 	private val cache = SoftRefLoaderCache<LabelBlockLookupKey, Array<Interval>>()
 
 	companion object {
 		private val LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
+
+		const val TYPE_STRING = LABEL_BLOCK_LOOKUP_TYPE_STRING
 
 		private val EMPTY_ARRAY = arrayOf<Interval>()
 
@@ -72,10 +82,19 @@ class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: 
 		cache.invalidateIf(parallelismThreshold, condition)
 	}
 
+	override fun setRelativeTo(container: String?, group: String?) {
+		if (container === null)
+			this.root = group
+		else if (group === null)
+			this.root = container
+		else
+			this.root = "$container/$group"
+	}
+
 	private fun readFromFile(key: LabelBlockLookupKey): Array<Interval> {
 
 		LOG.debug("Getting block list for id {} at level {}", key.id, key.level)
-		val path: Path? = getPath(key.level, key.id, pattern)
+		val path: Path? = getPath(key.level, key.id, completePattern)
 		LOG.debug("File path for block list for id {} at level {} is {}", key.id, key.level, path)
 
 		if (path == null) {
@@ -116,7 +135,7 @@ class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: 
 
 	private fun writeToFile(key: LabelBlockLookupKey, vararg intervals: Interval) {
 
-		val path: Path? = getPath(key.level, key.id, pattern)
+		val path: Path? = getPath(key.level, key.id, completePattern)
 
 		if (path == null) {
 			LOG.info("Path is null, cannot write!")
@@ -154,6 +173,16 @@ class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: 
 			private val serialVersionUID = 3063871520312958385L
 		}
 
+	}
+
+	override fun equals(other: Any?): Boolean {
+		if (other is LabelBlockLookupFromFile) {
+			return this === other ||
+					this.isRelative == other.isRelative &&
+					this.pattern == other.pattern &&
+					this.root == other.root
+		}
+		return false
 	}
 
 }

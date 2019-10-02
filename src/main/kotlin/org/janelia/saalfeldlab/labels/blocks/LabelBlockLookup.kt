@@ -13,6 +13,10 @@ interface LabelBlockLookup {
 	@Throws(IOException::class)
 	fun write(key: LabelBlockLookupKey, vararg intervals: Interval)
 
+	val isRelative: Boolean
+
+	fun setRelativeTo(container: String?, group: String?)
+
 	/**
 	 * Annotation for runtime discovery of compression schemes.
 	 *
@@ -30,10 +34,7 @@ interface LabelBlockLookup {
 	@Retention(AnnotationRetention.RUNTIME)
 	@Target(AnnotationTarget.FIELD)
 	@Inherited
-	annotation class Parameter
+	annotation class Parameter(val ignoreInSerializationIfRelative: Boolean = false)
 
-	fun getType(): String {
-		val compressionType = javaClass.getAnnotation(LookupType::class.java)
-		return compressionType!!.value
-	}
+	fun getType() = javaClass.getAnnotation(LookupType::class.java)!!.value
 }

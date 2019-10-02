@@ -8,11 +8,12 @@ import java.lang.reflect.Constructor
 import java.lang.reflect.Field
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Type
-import kotlin.reflect.full.findAnnotation
-import kotlin.reflect.full.memberProperties
-import kotlin.reflect.jvm.javaField
 
-class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserializer<LabelBlockLookup> {
+class LabelBlockLookupAdapter private constructor() : JsonSerializer<LabelBlockLookup>, JsonDeserializer<LabelBlockLookup> {
+
+	private data class ParameterMeta(
+			val clazz: Class<*>,
+			val ignoreInSerializationIfRelative: Boolean)
 
 	companion object {
 		private val LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
@@ -21,7 +22,7 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 
 		private val lookupConstructors = mutableMapOf<String, Constructor<out LabelBlockLookup>>()
 
-		private val lookupParameters = mutableMapOf<String, MutableMap<String, Class<*>>>()
+		private val lookupParameters = mutableMapOf<String, MutableMap<String, ParameterMeta>>()
 
 
 		private fun getDeclaredFields(clazz: Class<*>?, fields: MutableList<Field> = mutableListOf()): MutableList<Field> {
@@ -47,23 +48,14 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 					val klazz = clazz.kotlin
 					val type = (clazz.getAnnotation(LabelBlockLookup.LookupType::class.java)).value
 					val constructor = clazz.getDeclaredConstructor()
-					val parameters = mutableMapOf<String, Class<*>>()
+					val parameters = mutableMapOf<String, ParameterMeta>()
 					val fields = getDeclaredFields(clazz)
 					LOG.debug("Got fields {} for type {}", fields, type)
 
 					for (field in fields) {
 						LOG.debug("Checking if field {} has correct annotation {}", field, field.annotations)
-						if (field.getAnnotation(LabelBlockLookup.Parameter::class.java) != null) {
-							parameters.put(field.name, field.type)
-						}
-					}
-
-					LOG.debug("Got members {} for type {}", klazz.members, type)
-					for (property in klazz.memberProperties)
-					{
-						LOG.debug("Checking if field {} has correct annotation {}", property, property.annotations)
-						if (property.findAnnotation<LabelBlockLookup.Parameter>() != null) {
-							parameters.put(property.name, property.javaField!!.type)
+						field.getAnnotation(LabelBlockLookup.Parameter::class.java)?.let {
+							parameters[field.name] = ParameterMeta(field.type, it.ignoreInSerializationIfRelative)
 						}
 					}
 
@@ -100,17 +92,22 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 		val clazz = lookup.javaClass
 		val json = JsonObject()
 		json.addProperty("type", type)
-		val parameterTypes = lookupParameters.get(type)!!
+		val parameterTypes = lookupParameters[type]!!
 
 		LOG.debug("Got parameter types {}", parameterTypes)
 
 		try {
-			for ((name, _) in parameterTypes.entries) {
+			for ((name, meta) in parameterTypes.entries) {
+				if (lookup.isRelative && meta.ignoreInSerializationIfRelative)
+					continue
 				val field = clazz.getDeclaredField(name)
 				val isAccessible = field.isAccessible
-				field.isAccessible = true
-				val value = field.get(lookup)
-				field.isAccessible = isAccessible
+				val value = try {
+					field.isAccessible = true
+					field.get(lookup)
+				} finally {
+					field.isAccessible = isAccessible
+				}
 				json.add(name, context.serialize(value))
 			}
 
@@ -156,7 +153,7 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 			for ((name, ev) in parameterTypes.entries) {
 				LOG.debug("Getting name {} from object {} and type {}", name, jsonObject, ev)
 				jsonObject.get(name)
-				val parameter = context.deserialize<Any>(jsonObject.get(name), ev as Type)
+				val parameter = context.deserialize<Any>(jsonObject.get(name), ev.clazz as Type)
 				val field = clazz.getDeclaredField(name)
 				val isAccessible = field.isAccessible
 				field.isAccessible = true
