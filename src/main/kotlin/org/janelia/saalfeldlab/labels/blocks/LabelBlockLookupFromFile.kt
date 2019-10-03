@@ -15,7 +15,9 @@ import java.util.*
 import java.util.function.BiFunction
 import java.util.function.Predicate
 
-@LabelBlockLookup.LookupType("from-file")
+private const val LOOKUP_TYPE_IDENTIFIER = "from-file"
+
+@LabelBlockLookup.LookupType(LOOKUP_TYPE_IDENTIFIER)
 class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: String) : CachedLabelBlockLookup {
 
 	private constructor(): this("")
@@ -24,6 +26,9 @@ class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: 
 
 	companion object {
 		private val LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
+
+		@JvmStatic
+		val LOOKUP_TYPE = LOOKUP_TYPE_IDENTIFIER
 
 		private val EMPTY_ARRAY = arrayOf<Interval>()
 
@@ -71,6 +76,10 @@ class LabelBlockLookupFromFile(@LabelBlockLookup.Parameter private val pattern: 
 	override fun invalidateIf(parallelismThreshold: Long, condition: Predicate<LabelBlockLookupKey>?) {
 		cache.invalidateIf(parallelismThreshold, condition)
 	}
+
+	override fun equals(other: Any?) = other is LabelBlockLookupFromFile && other.pattern == pattern
+
+	override fun hashCode() = pattern.hashCode()
 
 	private fun readFromFile(key: LabelBlockLookupKey): Array<Interval> {
 
