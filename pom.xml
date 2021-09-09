@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>org.scijava</groupId>
 		<artifactId>pom-scijava</artifactId>
-		<version>27.0.1</version>
+		<version>30.0.0</version>
 	</parent>
 
 	<groupId>org.janelia.saalfeldlab</groupId>
@@ -78,6 +78,7 @@
 		<license.copyrightOwners>Stephan Saalfeld</license.copyrightOwners>
 		<imglib2-algorithm.version>0.10.0</imglib2-algorithm.version>
 		<dokka.version>0.9.17</dokka.version>
+		<kotlin.compiler.jvmTarget>1.8</kotlin.compiler.jvmTarget>
 
 		<!-- NB: Deploy releases to the ImageJ Maven repository. -->
 		<releaseProfiles>deploy-to-scijava</releaseProfiles>
