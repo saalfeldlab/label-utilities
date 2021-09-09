@@ -1,6 +1,12 @@
 package org.janelia.saalfeldlab.labels.blocks
 
-import com.google.gson.*
+import com.google.gson.JsonDeserializationContext
+import com.google.gson.JsonDeserializer
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
+import com.google.gson.JsonParseException
+import com.google.gson.JsonSerializationContext
+import com.google.gson.JsonSerializer
 import org.scijava.annotations.Index
 import org.slf4j.LoggerFactory
 import java.lang.invoke.MethodHandles
@@ -25,9 +31,9 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 
 
 		private fun getDeclaredFields(clazz: Class<*>?, fields: MutableList<Field> = mutableListOf()): MutableList<Field> {
-			if (clazz != null) {
-				fields.addAll(listOf(*clazz!!.declaredFields))
-				getDeclaredFields(clazz?.superclass, fields)
+			clazz?.let {
+				fields.addAll(listOf(*clazz.declaredFields))
+				getDeclaredFields(clazz.superclass, fields)
 			}
 			return fields
 		}
@@ -59,8 +65,7 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 					}
 
 					LOG.debug("Got members {} for type {}", klazz.members, type)
-					for (property in klazz.memberProperties)
-					{
+					for (property in klazz.memberProperties) {
 						LOG.debug("Checking if field {} has correct annotation {}", property, property.annotations)
 						if (property.findAnnotation<LabelBlockLookup.Parameter>() != null) {
 							parameters.put(property.name, property.javaField!!.type)
@@ -100,7 +105,7 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 		val clazz = lookup.javaClass
 		val json = JsonObject()
 		json.addProperty("type", type)
-		val parameterTypes = lookupParameters.get(type)!!
+		val parameterTypes = lookupParameters[type]!!
 
 		LOG.debug("Got parameter types {}", parameterTypes)
 
@@ -116,28 +121,25 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 
 			LOG.debug("Serialized lookup to {}", json);
 			return json
-		} catch (e: SecurityException) {
-			e.printStackTrace(System.err)
-			return null
-		} catch (e: IllegalArgumentException) {
-			e.printStackTrace(System.err)
-			return null
-		} catch (e: IllegalAccessException) {
-			e.printStackTrace(System.err)
-			return null
-		} catch (e: NoSuchFieldException) {
-			e.printStackTrace(System.err)
-			return null
+		} catch (ex: Exception) {
+			when (ex) {
+				is SecurityException,
+				is IllegalArgumentException,
+				is IllegalAccessException,
+				is NoSuchFieldError,
+				-> {
+					ex.printStackTrace(System.err)
+					return null
+				}
+				else -> throw ex
+			}
 		}
-
 	}
 
 	@Throws(JsonParseException::class)
 	override fun deserialize(json: JsonElement, typeOfT: Type, context: JsonDeserializationContext): LabelBlockLookup? {
 		val jsonObject = json.asJsonObject
-		val jsonType = jsonObject.get("type")
-		if (jsonType == null)
-			return null
+		val jsonType = jsonObject.get("type") ?: return null
 
 
 		val type = jsonType!!.asString
