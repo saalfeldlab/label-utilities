@@ -12,3 +12,6 @@
 *_completion
 .idea
 *.iml
+
+# jenv files
+.java-version
