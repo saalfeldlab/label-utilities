@@ -159,14 +159,10 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 				val field = lookup.javaClass.getDeclaredField(name)
 				val isAccessible = field.isAccessible
 				field.isAccessible = true
-				val modifiers = field.modifiers
-				modifiersField.setInt(field, modifiers and -17)
 				field.set(lookup, parameter)
-				modifiersField.setInt(field, modifiers)
 				field.isAccessible = isAccessible
 			}
 
-			modifiersField.isAccessible = isModifiersAccessible
 			return lookup
 		} catch (ex: Exception) {
 			when (ex) {
