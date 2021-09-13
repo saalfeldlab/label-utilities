@@ -102,7 +102,6 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 
 	override fun serialize(lookup: LabelBlockLookup, typeOfSrc: Type, context: JsonSerializationContext): JsonElement? {
 		val type = lookup.getType()
-		val clazz = lookup.javaClass
 		val json = JsonObject()
 		json.addProperty("type", type)
 		val parameterTypes = lookupParameters[type]!!
@@ -110,16 +109,18 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 		LOG.debug("Got parameter types {}", parameterTypes)
 
 		try {
-			for ((name, _) in parameterTypes.entries) {
-				val field = clazz.getDeclaredField(name)
-				val isAccessible = field.isAccessible
-				field.isAccessible = true
-				val value = field.get(lookup)
-				field.isAccessible = isAccessible
-				json.add(name, context.serialize(value))
-			}
+			parameterTypes.forEach { (paramName, _) ->
+				lookup.javaClass.getDeclaredField(paramName).let { field ->
+					val originalFieldAccess = field.isAccessible
+					field.isAccessible = true
 
-			LOG.debug("Serialized lookup to {}", json);
+					val value = field[lookup]
+					json.add(paramName, context.serialize(value))
+
+					field.isAccessible = originalFieldAccess
+				}
+			}
+			LOG.debug("Serialized lookup to {}", json)
 			return json
 		} catch (ex: Exception) {
 			when (ex) {
@@ -142,24 +143,20 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 		val jsonType = jsonObject.get("type") ?: return null
 
 
-		val type = jsonType!!.asString
-		val constructor = lookupConstructors.get(type) as Constructor<*>
+		val type = jsonType.asString
+		val constructor = lookupConstructors[type] as Constructor<*>
+
 		val isConstructorAccessible = constructor.isAccessible
 		constructor.isAccessible = true
-
 		try {
 			val lookup = constructor.newInstance() as LabelBlockLookup
-			val clazz = lookup.javaClass
-			val parameterTypes = lookupParameters.get(type)!!
-			val modifiersField = Field::class.java.getDeclaredField("modifiers")
-			val isModifiersAccessible = modifiersField.isAccessible
-			modifiersField.isAccessible = true
+			val parameterTypes = lookupParameters[type]
 
-			for ((name, ev) in parameterTypes.entries) {
+			parameterTypes?.forEach { (name, ev) ->
 				LOG.debug("Getting name {} from object {} and type {}", name, jsonObject, ev)
-				jsonObject.get(name)
 				val parameter = context.deserialize<Any>(jsonObject.get(name), ev as Type)
-				val field = clazz.getDeclaredField(name)
+
+				val field = lookup.javaClass.getDeclaredField(name)
 				val isAccessible = field.isAccessible
 				field.isAccessible = true
 				val modifiers = field.modifiers
@@ -171,29 +168,22 @@ class LabelBlockLookupAdapter() : JsonSerializer<LabelBlockLookup>, JsonDeserial
 
 			modifiersField.isAccessible = isModifiersAccessible
 			return lookup
-		} catch (e: IllegalAccessException) {
-			e.printStackTrace(System.err)
-			return null
-		} catch (e: IllegalArgumentException) {
-			e.printStackTrace(System.err)
-			return null
-		} catch (e: InvocationTargetException) {
-			e.printStackTrace(System.err)
-			return null
-		} catch (e: SecurityException) {
-			e.printStackTrace(System.err)
-			return null
-		} catch (e: NoSuchFieldException) {
-			e.printStackTrace(System.err)
-			return null
-		} catch (e: InstantiationException) {
-			e.printStackTrace(System.err)
-			return null
-		}
-		finally {
+		} catch (ex: Exception) {
+			when (ex) {
+				is IllegalAccessException,
+				is IllegalArgumentException,
+				is InvocationTargetException,
+				is SecurityException,
+				is NoSuchFieldException,
+				is InstantiationException,
+				-> {
+					ex.printStackTrace(System.err)
+					return null
+				}
+				else -> throw ex
+			}
+		} finally {
 			constructor.isAccessible = false
 		}
-
 	}
-
 }
