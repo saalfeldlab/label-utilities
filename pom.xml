@@ -80,7 +80,7 @@
 		<dokka.version>0.9.17</dokka.version>
 
 		<!-- NB: Deploy releases to the ImageJ Maven repository. -->
-		<releaseProfiles>deploy-to-scijava</releaseProfiles>
+		<releaseProfiles>sign,deploy-to-scijava</releaseProfiles>
 
 		<imglib2-cache.version>1.0.0-beta-13</imglib2-cache.version>
 	</properties>
