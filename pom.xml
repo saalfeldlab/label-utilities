@@ -68,8 +68,8 @@
 		<url>https://github.com/saalfeldlab/label-utilities/issues</url>
 	</issueManagement>
 	<ciManagement>
-		<system>Travis CI</system>
-		<url>https://travis-ci.org/saalfeldlab/label-utilities</url>
+		<system>GitHub Actions</system>
+		<url>https://github.com/saalfeldlab/label-utilities/actions</url>
 	</ciManagement>
 
 	<properties>
