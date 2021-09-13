@@ -1,2 +1,2 @@
-[![](https://travis-ci.org/saalfeldlab/label-utilities.svg?branch=master)](https://travis-ci.org/saalfeldlab/label-utilities)
+[![](https://github.com/saalfeldlab/label-utilities/actions/workflows/build-main.yml/badge.svg)](https://github.com/saalfeldlab/label-utilities/actions/workflows/build-main.yml)
 
