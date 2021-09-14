@@ -30,7 +30,7 @@
 	<mailingLists>
 		<mailingList>
 			<name>ImageJ Forum</name>
-			<archive>http://forum.image.sc/</archive>
+			<archive>https://forum.image.sc/</archive>
 		</mailingList>
 	</mailingLists>
 
@@ -38,7 +38,7 @@
 		<developer>
 			<id>hanslovsky</id>
 			<name>Philipp Hanslovsky</name>
-			<url>http://imagej.net/User:Hanslovsky</url>
+			<url>https://imagej.net/User:Hanslovsky</url>
 			<roles>
 				<role>founder</role>
 				<role>lead</role>
@@ -92,7 +92,7 @@
 		</repository>
 		<repository>
 			<id>scijava.public</id>
-			<url>http://maven.scijava.org/content/groups/public</url>
+			<url>https://maven.scijava.org/content/groups/public</url>
 		</repository>
 	</repositories>
 
